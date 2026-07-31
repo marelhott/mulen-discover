@@ -6,7 +6,7 @@ export const maxDuration = 60;
 
 function isAuthorized(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) return true;
+  if (!cronSecret) return false;
 
   const { searchParams } = new URL(request.url);
   const bearer = request.headers.get("authorization");
@@ -20,15 +20,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const warmed = await warmNewsCaches();
-
-  return NextResponse.json({
-    ok: true,
-    ...warmed,
-    warmedAt: new Date().toISOString(),
-  }, {
-    headers: {
-      "Cache-Control": "no-store, max-age=0",
-    },
-  });
+  try {
+    const warmed = await warmNewsCaches();
+    return NextResponse.json({
+      ok: true,
+      ...warmed,
+      warmedAt: new Date().toISOString(),
+    }, {
+      headers: {
+        "Cache-Control": "no-store, max-age=0",
+      },
+    });
+  } catch (error) {
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Refresh failed" }, { status: 502 });
+  }
 }

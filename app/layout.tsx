@@ -22,18 +22,18 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Movie Releases",
-  description: "Filmové novinky, trending tituly a nové releasy na jednom místě.",
+  title: "Film a novinky",
+  description: "Filmové novinky, nové tituly a ověřené releasy na jednom místě.",
   openGraph: {
-    title: "Movie Releases",
-    description: "Filmové novinky, trending tituly a nové releasy na jednom místě.",
+    title: "Film a novinky",
+    description: "Filmové novinky, nové tituly a ověřené releasy na jednom místě.",
     type: "website",
     url: siteUrl,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Movie Releases",
-    description: "Filmové novinky, trending tituly a nové releasy na jednom místě.",
+    title: "Film a novinky",
+    description: "Filmové novinky, nové tituly a ověřené releasy na jednom místě.",
   },
 };
 

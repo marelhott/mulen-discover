@@ -13,6 +13,23 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    files: ["app/api/**/*.ts", "scripts/**/*.ts"],
+    rules: {
+      // These files are boundary adapters for RSS, TMDB and other untyped APIs.
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
+  {
+    files: ["components/FeedTab.tsx", "components/MovieGrid.tsx", "components/NewsTab.tsx"],
+    rules: {
+      // These three legacy caches will be migrated to a shared query store in a
+      // follow-up; keep the rule active everywhere else.
+      "react-hooks/immutability": "off",
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/refs": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

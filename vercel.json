@@ -1,7 +1,7 @@
 {
   "crons": [
-    { "path": "/api/news/precompute",  "schedule": "*/20 * * * *" },
-    { "path": "/api/feed/precompute",  "schedule": "*/20 * * * *" },
-    { "path": "/api/movies?page=1",    "schedule": "*/30 * * * *" }
+    { "path": "/api/news/precompute",  "schedule": "*/5 * * * *" },
+    { "path": "/api/feed/precompute",  "schedule": "*/5 * * * *" },
+    { "path": "/api/movies/precompute", "schedule": "*/5 * * * *" }
   ]
 }

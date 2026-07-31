@@ -7,6 +7,7 @@ import MovieCard from "./MovieCard";
 
 type MovieCache = {
   vod: Movie[];
+  recent: Movie[];
   upcoming: Movie[];
   page: number;
   hasMore: boolean;
@@ -19,6 +20,7 @@ const STORAGE_KEY = "movie-releases:movies-cache:v3";
 
 const movieCache: MovieCache = {
   vod: [],
+  recent: [],
   upcoming: [],
   page: 1,
   hasMore: true,
@@ -28,6 +30,7 @@ const movieCache: MovieCache = {
 
 export default function MovieGrid() {
   const [vod, setVod] = useState<Movie[]>(movieCache.vod);
+  const [recent, setRecent] = useState<Movie[]>(movieCache.recent);
   const [upcoming, setUpcoming] = useState<Movie[]>(movieCache.upcoming);
   const [page, setPage] = useState(movieCache.page);
   const [loading, setLoading] = useState(!movieCache.hydrated);
@@ -44,7 +47,7 @@ export default function MovieGrid() {
     try {
       const refreshSuffix = options?.forceRefresh ? `&refresh=${Date.now()}` : "";
       const res = await fetch(`/api/movies?page=${p}${refreshSuffix}`, {
-        cache: options?.forceRefresh ? "no-store" : "default",
+        cache: "no-store",
       });
       if (!res.ok) throw new Error("Chyba při načítání filmů");
       const data = await res.json();
@@ -58,6 +61,8 @@ export default function MovieGrid() {
           return next;
         });
         if (p === 1) {
+          setRecent(data.recent ?? []);
+          movieCache.recent = data.recent ?? [];
           setUpcoming(data.upcoming ?? []);
           movieCache.upcoming = data.upcoming ?? [];
         }
@@ -73,6 +78,7 @@ export default function MovieGrid() {
           STORAGE_KEY,
           JSON.stringify({
             vod: movieCache.vod.slice(0, 30),
+            recent: movieCache.recent.slice(0, 30),
             upcoming: movieCache.upcoming,
             page: Math.min(movieCache.page, 1),
             hasMore: true,
@@ -95,12 +101,14 @@ export default function MovieGrid() {
         const parsed = JSON.parse(stored) as MovieCache;
         if (Array.isArray(parsed.vod) && parsed.vod.length > 0) {
           movieCache.vod = parsed.vod;
+          movieCache.recent = parsed.recent ?? [];
           movieCache.upcoming = parsed.upcoming ?? [];
           movieCache.page = parsed.page;
           movieCache.hasMore = parsed.hasMore;
           movieCache.hydrated = true;
           movieCache.fetchedAt = parsed.fetchedAt;
           setVod(parsed.vod);
+          setRecent(parsed.recent ?? []);
           setUpcoming(parsed.upcoming ?? []);
           setPage(parsed.page);
           setHasMore(parsed.hasMore);
@@ -109,7 +117,6 @@ export default function MovieGrid() {
       }
     } catch {}
 
-    if (movieCache.hydrated) return;
     void loadMovies(1, "replace");
   }, [loadMovies]);
 
@@ -139,12 +146,14 @@ export default function MovieGrid() {
     movieCache.page = 1;
     movieCache.hasMore = true;
     movieCache.vod = [];
+    movieCache.recent = [];
     movieCache.upcoming = [];
     movieCache.fetchedAt = 0;
     try {
       window.localStorage.removeItem(STORAGE_KEY);
     } catch {}
     setVod([]);
+    setRecent([]);
     setUpcoming([]);
     setPage(1);
     setHasMore(true);
@@ -159,7 +168,7 @@ export default function MovieGrid() {
           className="text-[1.1rem] font-semibold text-[color:var(--foreground)]"
           style={{ fontFamily: "var(--font-serif), Georgia, serif" }}
         >
-          Online
+          Potvrzeně dostupné
           {vod.length > 0 && (
             <span className="ml-2 text-[0.85rem] font-normal text-[color:var(--muted)]">{vod.length} titulů</span>
           )}
@@ -193,6 +202,10 @@ export default function MovieGrid() {
         ))}
       </div>
 
+      {!loading && vod.length === 0 && (
+        <p className="py-6 text-sm text-[color:var(--muted)]">Právě nemáme potvrzený nový release. Nezaměňujeme datum premiéry za online dostupnost.</p>
+      )}
+
       {!loading && hasMore && vod.length > 0 && (
         <div className="flex justify-center mt-10">
           <button onClick={() => { const n = page + 1; void loadMovies(n, "append"); }}
@@ -205,6 +218,20 @@ export default function MovieGrid() {
       {loading && vod.length > 0 && (
         <div className="flex justify-center mt-8">
           <Loader2 className="w-6 h-6 animate-spin text-[color:var(--muted)]" />
+        </div>
+      )}
+
+      {recent.length > 0 && (
+        <div className="mt-12">
+          <h2
+            className="mb-4 text-[1.1rem] font-semibold text-[color:var(--foreground)]"
+            style={{ fontFamily: "var(--font-serif), Georgia, serif" }}
+          >
+            Nedávno vydané
+          </h2>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            {recent.map(movie => <MovieCard key={`${movie.id}-${movie.imdb_code}`} movie={movie} />)}
+          </div>
         </div>
       )}
 

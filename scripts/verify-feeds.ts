@@ -28,9 +28,8 @@ const AI_SOURCES = [
   { name: "The Verge AI",     url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",         topic: "AI news" },
   { name: "MIT Tech Review",  url: "https://www.technologyreview.com/topic/artificial-intelligence/feed/",      topic: "AI research" },
   { name: "TechCrunch AI",    url: "https://techcrunch.com/category/artificial-intelligence/feed/",             topic: "AI startups and products" },
-  { name: "VentureBeat AI",   url: "https://venturebeat.com/category/ai/feed/",                                 topic: "AI business news" },
+  { name: "NVIDIA Blog",      url: "https://blogs.nvidia.com/feed/",                                            topic: "AI hardware and products" },
   { name: "The Decoder",      url: "https://the-decoder.com/feed/",                                             topic: "AI news" },
-  { name: "Microsoft AI",     url: "https://blogs.microsoft.com/ai/feed/",                                      topic: "Microsoft AI" },
   { name: "Google AI Blog",   url: "https://blog.google/technology/ai/rss/",                                    topic: "Google AI" },
 ];
 

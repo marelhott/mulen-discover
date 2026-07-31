@@ -182,17 +182,6 @@ function ArticleModal({ article, onClose }: { article: NewsArticle; onClose: () 
   );
 }
 
-const SOURCE_BADGE: Record<string, string> = {
-  "Deadline": "bg-red-900/80 text-red-300",
-  "Film New Europe": "bg-cyan-900/80 text-cyan-300",
-  "Hollywood Reporter": "bg-purple-900/80 text-purple-300",
-  "IndieWire": "bg-blue-900/80 text-blue-300",
-  "MovieZone.cz": "bg-emerald-900/80 text-emerald-300",
-  "Screen Daily": "bg-amber-900/80 text-amber-300",
-  "Variety": "bg-orange-900/80 text-orange-300",
-};
-
-
 function NewsCard({ article, onClick }: { article: NewsArticle; onClick: () => void }) {
   const [imgError, setImgError] = useState(false);
   const [personId, setPersonId] = useState<number | null>(null);
@@ -312,7 +301,7 @@ export default function NewsTab() {
     try {
       const refreshSuffix = options?.forceRefresh ? `&refresh=${Date.now()}` : "";
       const res = await fetch(`/api/news?page=${nextPage}&pageSize=${PAGE_SIZE}${refreshSuffix}`, {
-        cache: options?.forceRefresh ? "no-store" : "default",
+        cache: "no-store",
       });
       if (!res.ok) throw new Error("Chyba načítání");
       const payload = await res.json() as NewsResponse;
@@ -380,7 +369,6 @@ export default function NewsTab() {
       }
     } catch {}
 
-    if (newsCache.hydrated) return;
     void loadPage(1, "replace");
   }, [loadPage]);
 

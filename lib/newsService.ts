@@ -1,6 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import { unstable_cache } from "next/cache";
 import { hasGoogleTranslateKey, translateTexts } from "@/lib/googleTranslate";
+import { readSnapshot, writeSnapshot } from "@/lib/snapshotStore";
 
 const RSS_ITEMS_PER_SOURCE = 18;
 const DEFAULT_PAGE_SIZE = 30;
@@ -29,28 +30,28 @@ const STOPWORDS = new Set([
 ]);
 
 const CATEGORY_LABELS: Record<NewsCategory, string> = {
-  awards: "Awards",
-  box_office: "Box office",
-  breaking: "Breaking",
-  casting: "Casting",
+  awards: "Ocenění",
+  box_office: "Tržby",
+  breaking: "Mimořádná zpráva",
+  casting: "Obsazení",
   development: "Vývoj projektu",
   european: "Evropský film",
   festival: "Festivaly",
-  industry: "Business",
+  industry: "Filmový průmysl",
   interview: "Rozhovor",
   opinion: "Komentář",
   other: "Novinka",
   review: "Recenze",
-  trailer: "Trailer",
+  trailer: "Upoutávka",
 };
 
 const SOURCE_LOOKUP = {
-  "Deadline": { url: "https://deadline.com/v/film/feed/", name: "Deadline", focus: "breaking news, castingy & box office", lang: "en" },
-  "Variety": { url: "https://variety.com/c/film/feed/", name: "Variety", focus: "průmysl & business", lang: "en" },
-  "Hollywood Reporter": { url: "https://www.hollywoodreporter.com/c/movies/movie-news/feed/", name: "Hollywood Reporter", focus: "festivaly, rozhovory & awards", lang: "en" },
-  "IndieWire": { url: "https://www.indiewire.com/c/film/feed/", name: "IndieWire", focus: "indie & autorský film", lang: "en" },
+  "Deadline": { url: "https://deadline.com/v/film/feed/", name: "Deadline", focus: "aktuální zprávy, obsazení a tržby", lang: "en" },
+  "Variety": { url: "https://variety.com/c/film/feed/", name: "Variety", focus: "filmový průmysl", lang: "en" },
+  "Hollywood Reporter": { url: "https://www.hollywoodreporter.com/c/movies/movie-news/feed/", name: "Hollywood Reporter", focus: "festivaly, rozhovory a ocenění", lang: "en" },
+  "IndieWire": { url: "https://www.indiewire.com/c/film/feed/", name: "IndieWire", focus: "nezávislý a autorský film", lang: "en" },
   "MovieZone.cz": { url: "https://www.moviezone.cz/rss/", name: "MovieZone.cz", focus: "české trailery & novinky", lang: "cs" },
-  "Screen Daily": { url: "https://www.screendaily.com/1366.rss", name: "Screen Daily", focus: "evropský filmový byznys, festivaly & severské tituly", lang: "en" },
+  "Screen Daily": { url: "https://www.screendaily.com/1366.rss", name: "Screen Daily", focus: "evropský filmový průmysl, festivaly a severské tituly", lang: "en" },
   "Film New Europe": { url: "https://www.filmneweurope.com/?format=feed&type=rss", name: "Film New Europe", focus: "nové evropské filmy & regionální produkce", lang: "en" },
 } as const;
 
@@ -822,27 +823,23 @@ async function translateClusterBatch(clusters: ClusteredArticle[], tmdbKey?: str
 async function generateClusterBatch(clusters: ClusteredArticle[]) {
   const { tmdb } = getKeys();
   if (!hasGoogleTranslateKey()) {
+    throw new Error("Překladač není nakonfigurovaný");
+  }
+
+  const englishClusters = clusters.filter((cluster) => cluster.lang !== "cs");
+
+  if (englishClusters.length === 0) {
     return clusters.map((cluster) => buildLocalArticle(cluster));
   }
 
-  try {
-    const englishClusters = clusters.filter((cluster) => cluster.lang !== "cs");
+  const translated = await translateClusterBatch(englishClusters, tmdb);
+  const translatedByLink = new Map(translated.map((article) => [article.link, article]));
 
-    if (englishClusters.length === 0) {
-      return clusters.map((cluster) => buildLocalArticle(cluster));
-    }
-
-    const translated = await translateClusterBatch(englishClusters, tmdb);
-    const translatedByLink = new Map(translated.map((article) => [article.link, article]));
-
-    return clusters.map((cluster) =>
-      cluster.lang === "cs"
-        ? buildLocalArticle(cluster)
-        : translatedByLink.get(cluster.lead.link) ?? buildLocalArticle(cluster)
-    );
-  } catch {
-    return clusters.map((cluster) => buildLocalArticle(cluster));
-  }
+  return clusters.map((cluster) =>
+    cluster.lang === "cs"
+      ? buildLocalArticle(cluster)
+      : translatedByLink.get(cluster.lead.link) ?? (() => { throw new Error("Chybí překlad článku"); })()
+  );
 }
 
 const getCachedClusterBatch = unstable_cache(
@@ -850,7 +847,7 @@ const getCachedClusterBatch = unstable_cache(
     const clusters = JSON.parse(payload) as ClusteredArticle[];
     return generateClusterBatch(clusters);
   },
-  ["news-cluster-batch-v2"],
+  ["news-cluster-batch-v3"],
   { revalidate: 604800 }
 );
 
@@ -921,16 +918,33 @@ export async function getNewsPage(page: number, pageSize: number, forceRefresh: 
     : getCachedNewsPage(safePage, safePageSize);
 }
 
-export async function warmNewsCaches() {
-  await getRawNewsFeed();
-  await getClusteredNewsFeed();
-  await Promise.all([
-    getCachedNewsPage(1, DEFAULT_PAGE_SIZE),
-    getCachedNewsPage(2, DEFAULT_PAGE_SIZE),
-    getCachedNewsPage(3, DEFAULT_PAGE_SIZE),
-  ]);
+export type NewsSnapshotData = {
+  articles: NewsArticle[];
+  total: number;
+};
 
-  return {
-    warmedPages: [1, 2, 3],
-  };
+async function buildAllNews(forceRefresh: boolean): Promise<NewsSnapshotData> {
+  const clustered = forceRefresh
+    ? await enrichClusterImages(mergeSimilarClusters(clusterArticles(rankArticles(await buildRawNewsFeed()))))
+    : await getClusteredNewsFeed();
+  const batches: ClusteredArticle[][] = [];
+  for (let index = 0; index < clustered.length; index += TRANSLATION_BATCH_SIZE) {
+    batches.push(clustered.slice(index, index + TRANSLATION_BATCH_SIZE));
+  }
+  const translated = await Promise.all(batches.map((batch) => getCachedClusterBatch(JSON.stringify(batch))));
+  return { articles: translated.flat(), total: clustered.length };
+}
+
+export async function readNewsSnapshot() {
+  return readSnapshot<NewsSnapshotData>("news");
+}
+
+export async function refreshNewsSnapshot() {
+  const data = await buildAllNews(true);
+  return writeSnapshot("news", data, data.articles.length);
+}
+
+export async function warmNewsCaches() {
+  const snapshot = await refreshNewsSnapshot();
+  return { warmedPages: [1, 2, 3], items: snapshot?.itemCount ?? 0 };
 }

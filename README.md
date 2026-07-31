@@ -1,4 +1,24 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Film a novinky
+
+Český přehled AI, technologií, filmových novinek a ověřených releasů. Veřejné API čte hotové snapshoty z privátního Vercel Blob úložiště; cron každých pět minut stáhne zdroje, přeloží jen nové položky a atomicky publikuje novou verzi.
+
+## Produkční proměnné
+
+- `BLOB_READ_WRITE_TOKEN` — připojené privátní Vercel Blob úložiště.
+- `OPENROUTER_API_KEY` — primární překladač; výchozí model je `qwen/qwen3.7-flash`, fallback `google/gemini-3.1-flash-lite`.
+- `CRON_SECRET` — chrání interní aktualizační endpointy.
+- `TMDB_API_KEY` — filmová metadata.
+
+`GEMINI_API_KEY` a Google Translate jsou pouze nouzové zálohy, pokud OpenRouter dočasně selže.
+
+## Ověření
+
+```bash
+npm run lint
+npm run build
+npm run verify-feeds
+npm run verify-production
+```
 
 ## Getting Started
 

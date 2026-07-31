@@ -27,6 +27,12 @@ interface FilmItem {
   character?: string;
 }
 
+function localizeProfession(value: string) {
+  if (value === "Acting") return "Herectví";
+  if (value === "Directing") return "Režie";
+  return value;
+}
+
 function FilmCard({ film }: { film: FilmItem }) {
   const [err, setErr] = useState(false);
   return (
@@ -122,7 +128,7 @@ export default function PersonModal({ personId, onClose }: { personId: number; o
               </div>
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl font-bold text-[color:var(--foreground)] sm:text-2xl">{data.name}</h2>
-                <p className="mt-0.5 text-sm text-[color:var(--accent)]">{data.known_for}</p>
+                <p className="mt-0.5 text-sm text-[color:var(--accent)]">{localizeProfession(data.known_for)}</p>
                 <div className="mt-2 flex flex-wrap gap-3 text-sm text-[color:var(--muted)]">
                   {data.birthday && (
                     <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{data.birthday}</span>

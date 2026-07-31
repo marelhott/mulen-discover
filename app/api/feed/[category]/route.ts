@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { XMLParser } from "fast-xml-parser";
-import { unstable_cache } from "next/cache";
 import { hasGoogleTranslateKey, translateTexts } from "@/lib/googleTranslate";
+import { readSnapshot, writeSnapshot } from "@/lib/snapshotStore";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -20,7 +20,6 @@ const AI_SOURCES: FeedSource[] = [
   { name: "The Decoder",      url: "https://the-decoder.com/feed/",                                              siteUrl: "https://the-decoder.com/",                         weight: 1.1  },
   { name: "Google AI Blog",   url: "https://blog.google/technology/ai/rss/",                                     siteUrl: "https://blog.google/technology/ai/",               weight: 1.15 },
   { name: "NVIDIA Blog",      url: "https://blogs.nvidia.com/feed/",                                             siteUrl: "https://blogs.nvidia.com/",                        weight: 1.08 },
-  { name: "Anthropic News",   url: "https://www.anthropic.com/rss.xml",                                          siteUrl: "https://www.anthropic.com/news",                   weight: 1.25 },
 ];
 
 const TECH_SOURCES: FeedSource[] = [
@@ -255,23 +254,20 @@ function rankArticles(articles: FeedArticle[]): FeedArticle[] {
 }
 
 async function translateBatch(articles: FeedArticle[]): Promise<FeedArticle[]> {
-  try {
-    if (articles.length === 0 || !hasGoogleTranslateKey()) return articles;
-    const titleInput = articles.map((article) => article.title);
-    const summaryInput = articles.map((article) => article.summary || "");
-    const [titleTranslations, summaryTranslations] = await Promise.all([
-      translateTexts(titleInput),
-      translateTexts(summaryInput),
-    ]);
+  if (articles.length === 0) return articles;
+  if (!hasGoogleTranslateKey()) throw new Error("Překladač není nakonfigurovaný");
+  const titleInput = articles.map((article) => article.title);
+  const summaryInput = articles.map((article) => article.summary || "");
+  const [titleTranslations, summaryTranslations] = await Promise.all([
+    translateTexts(titleInput),
+    translateTexts(summaryInput),
+  ]);
 
-    return articles.map((article, index) => ({
-      ...article,
-      title_cs: titleTranslations[index]?.trim() || article.title,
-      summary_cs: summaryTranslations[index]?.trim() || article.summary,
-    }));
-  } catch {
-    return articles;
-  }
+  return articles.map((article, index) => ({
+    ...article,
+    title_cs: titleTranslations[index]?.trim(),
+    summary_cs: summaryTranslations[index]?.trim(),
+  }));
 }
 
 // ── Build feed pipeline ───────────────────────────────────────────────────────
@@ -300,21 +296,26 @@ async function buildFeed(category: "ai" | "tech", fresh = false): Promise<FeedAr
   }));
 }
 
-export const getCachedFeed = unstable_cache(
-  async (category: "ai" | "tech") => buildFeed(category),
-  ["feed-category-v6"],
-  { revalidate: 1200 }
-);
+type FeedSnapshotData = { articles: FeedArticle[] };
+
+async function refreshFeedSnapshot(category: "ai" | "tech") {
+  const articles = await buildFeed(category, true);
+  return writeSnapshot(category, { articles } satisfies FeedSnapshotData, articles.length);
+}
+
+async function getFeedSnapshot(category: "ai" | "tech") {
+  return readSnapshot<FeedSnapshotData>(category);
+}
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export async function warmFeedCaches() {
   const [ai, tech] = await Promise.allSettled([
-    buildFeed("ai"), buildFeed("tech"),
+    refreshFeedSnapshot("ai"), refreshFeedSnapshot("tech"),
   ]);
   return {
-    ai: ai.status === "fulfilled" ? ai.value.length : 0,
-    tech: tech.status === "fulfilled" ? tech.value.length : 0,
+    ai: ai.status === "fulfilled" ? ai.value?.itemCount ?? 0 : 0,
+    tech: tech.status === "fulfilled" ? tech.value?.itemCount ?? 0 : 0,
   };
 }
 
@@ -326,14 +327,24 @@ export async function GET(
   if (category !== "ai" && category !== "tech") {
     return NextResponse.json({ error: "Unknown category" }, { status: 400 });
   }
-  const forceRefresh = new URL(request.url).searchParams.has("refresh");
-  const articles = forceRefresh
-    ? await buildFeed(category, true)
-    : await getCachedFeed(category);
+  let snapshot = await getFeedSnapshot(category);
+  if (!snapshot) snapshot = await refreshFeedSnapshot(category);
+  if (!snapshot) {
+    return NextResponse.json({ error: "Český snapshot zatím není připravený" }, { status: 503 });
+  }
 
-  return NextResponse.json({ articles }, {
+  const ageMs = Date.now() - new Date(snapshot.sourceFetchedAt).getTime();
+  if (ageMs > 5 * 60_000) {
+    after(async () => { await refreshFeedSnapshot(category); });
+  }
+
+  return NextResponse.json({ ...snapshot.data, freshness: {
+    version: snapshot.version,
+    sourceFetchedAt: snapshot.sourceFetchedAt,
+    translatedAt: snapshot.translatedAt,
+  } }, {
     headers: {
-      "Cache-Control": forceRefresh ? "no-store" : "public, s-maxage=1800, stale-while-revalidate=3600",
+      "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
     },
   });
 }

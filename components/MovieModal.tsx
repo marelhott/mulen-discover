@@ -100,8 +100,8 @@ export default function MovieModal({ movie, onClose }: { movie: Movie; onClose: 
 
             {/* Details */}
             <div className="min-w-0 flex-1 pt-0 sm:pt-0">
-              <h2 className="text-xl font-bold leading-tight text-[color:var(--foreground)] sm:text-2xl">{movie.title}</h2>
-              {movie.czech_title && <p className="mt-0.5 text-[color:var(--muted)]">{movie.czech_title}</p>}
+              <h2 className="text-xl font-bold leading-tight text-[color:var(--foreground)] sm:text-2xl">{movie.czech_title ?? movie.title}</h2>
+              {movie.czech_title && <p className="mt-0.5 text-[color:var(--muted)]">Původní název: {movie.title}</p>}
 
               <div className="mt-3 flex flex-wrap gap-3 text-sm text-[color:var(--muted)]">
                 <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />{movie.year}</span>
@@ -134,7 +134,7 @@ export default function MovieModal({ movie, onClose }: { movie: Movie; onClose: 
               {/* No release notice */}
               {movie.torrents?.length === 0 && (movie.releases?.length ?? 0) === 0 && (
                 <p className="mt-4 text-sm italic text-[color:var(--muted)]">
-                  Zatím bez releasu — hlídáme YTS a scénu.
+                  Zatím bez potvrzeného releasu.
                 </p>
               )}
 
@@ -186,7 +186,7 @@ export default function MovieModal({ movie, onClose }: { movie: Movie; onClose: 
               {/* Torrents (YTS) */}
               {movie.torrents?.length > 0 && (
                 <div className="mt-5">
-                  <p className="mb-2 text-xs uppercase tracking-wider text-[color:var(--muted)]">Stáhnout z YTS</p>
+                    <p className="mb-2 text-xs uppercase tracking-wider text-[color:var(--muted)]">Dostupné varianty</p>
                   <div className="flex flex-wrap gap-2">
                     {movie.torrents.map((t, i) => {
                       const slug = movie.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -208,7 +208,7 @@ export default function MovieModal({ movie, onClose }: { movie: Movie; onClose: 
               {movie.releases?.length > 0 && (
                 <div className="mt-5">
                   <div className="mb-2 flex items-center justify-between">
-                    <p className="text-xs uppercase tracking-wider text-[color:var(--muted)]">Scene releasy</p>
+                    <p className="text-xs uppercase tracking-wider text-[color:var(--muted)]">Doložené releasy</p>
                     <a href={`https://www.1337x.to/search/${encodeURIComponent(movie.title + " " + movie.year)}/1/`}
                       target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-1 rounded-lg bg-[color:var(--accent)]/10 px-2 py-1 text-[11px] font-medium text-[color:var(--accent)] hover:bg-[color:var(--accent)]/20 transition-colors">

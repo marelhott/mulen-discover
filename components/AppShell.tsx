@@ -12,9 +12,10 @@ export default function AppShell() {
     ai: true, tech: false, news: false, releases: false,
   });
 
-  useEffect(() => {
-    setVisited((current) => (current[tab] ? current : { ...current, [tab]: true }));
-  }, [tab]);
+  const selectTab = (nextTab: Tab) => {
+    setVisited((current) => (current[nextTab] ? current : { ...current, [nextTab]: true }));
+    setTab(nextTab);
+  };
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -35,13 +36,13 @@ export default function AppShell() {
       <header className="sticky top-0 z-40 border-b border-[color:var(--line)] bg-[color:var(--background)]/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-screen-2xl items-center gap-6 px-4 sm:px-6">
           <button
-            onClick={() => { setTab("ai"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+            onClick={() => { selectTab("ai"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
             className="flex-shrink-0 text-[0.9375rem] font-semibold tracking-[-0.02em] text-[color:var(--foreground)] hover:text-[color:var(--accent)] transition-colors"
             style={{ fontFamily: "var(--font-serif), Georgia, serif" }}
           >
-            Release
+            Přehled
           </button>
-          <TabNav active={tab} onChange={setTab} />
+          <TabNav active={tab} onChange={selectTab} />
         </div>
       </header>
 

@@ -43,7 +43,7 @@ function sourceDomain(name: string): string {
     "Hugging Face": "huggingface.co", "The Verge AI": "theverge.com",
     "MIT Tech Review": "technologyreview.com", "TechCrunch AI": "techcrunch.com",
     "The Decoder": "the-decoder.com", "Google AI Blog": "blog.google",
-    "NVIDIA Blog": "nvidia.com", "Anthropic News": "anthropic.com",
+    "NVIDIA Blog": "nvidia.com",
     "Hacker News": "news.ycombinator.com", "Ars Technica": "arstechnica.com",
     "The Verge": "theverge.com", "The Register": "theregister.com",
     "9to5Mac": "9to5mac.com", "Engadget": "engadget.com",
@@ -172,7 +172,7 @@ function ArticleModal({ article, onClose }: { article: FeedArticle; onClose: () 
 // ── Feed card ─────────────────────────────────────────────────────────────────
 
 function FeedCard({ article, onClick }: { article: FeedArticle; onClick: () => void }) {
-  const [imgSrc, setImgSrc] = useState<string | null>(article.image);
+  const imgSrc = article.image;
   const [imgError, setImgError] = useState(false);
 
   const title = article.title_cs ?? article.title;
@@ -200,11 +200,13 @@ function FeedCard({ article, onClick }: { article: FeedArticle; onClick: () => v
           /* Fallback: source logo centred on muted bg */
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
             {logoUrl ? (
-              <img
+              <Image
                 src={logoUrl}
                 alt={article.source}
+                width={32}
+                height={32}
                 className="h-8 w-8 rounded-md opacity-50"
-                onError={() => {}}
+                unoptimized
               />
             ) : (
               <svg className="h-7 w-7 text-[color:var(--faint)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -258,7 +260,7 @@ export default function FeedTab({ category }: { category: FeedCategory }) {
     setError(null);
     try {
       const url = `/api/feed/${category}${forceRefresh ? "?refresh=1" : ""}`;
-      const res = await fetch(url, { cache: forceRefresh ? "no-store" : "default" });
+      const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) throw new Error("Chyba při načítání");
       const data = await res.json();
       const items: FeedArticle[] = data.articles ?? [];
@@ -272,7 +274,7 @@ export default function FeedTab({ category }: { category: FeedCategory }) {
     } finally {
       setLoading(false);
     }
-  }, [category]);
+  }, [category, cache]);
 
   useEffect(() => {
     try {
@@ -289,9 +291,9 @@ export default function FeedTab({ category }: { category: FeedCategory }) {
       }
     } catch {}
 
-    if (!cache.hydrated || Date.now() - cache.fetchedAt >= CACHE_TTL_MS) {
-      void load();
-    }
+    // Local data paints immediately, but every app load verifies the current
+    // published snapshot in the background.
+    void load();
 
     const interval = window.setInterval(() => {
       if (Date.now() - cache.fetchedAt < CACHE_TTL_MS) return;
@@ -309,14 +311,14 @@ export default function FeedTab({ category }: { category: FeedCategory }) {
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [load, category]);
+  }, [load, category, cache]);
 
   const refresh = useCallback(() => {
     cache.hydrated = false; cache.articles = []; cache.fetchedAt = 0;
     try { localStorage.removeItem(storageKey(category)); } catch {}
     setArticles([]);
     void load(true);
-  }, [load, category]);
+  }, [load, category, cache]);
 
   const heading = category === "ai" ? "Umělá inteligence" : "Technologie";
 

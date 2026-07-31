@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { warmFeedCaches } from "@/app/api/feed/[category]/route";
+import { refreshMoviesSnapshot } from "@/app/api/movies/route";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -7,18 +7,14 @@ export const maxDuration = 60;
 function isAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
-  const bearer = request.headers.get("authorization");
-  const query = new URL(request.url).searchParams.get("secret");
-  return bearer === `Bearer ${secret}` || query === secret;
+  return request.headers.get("authorization") === `Bearer ${secret}`;
 }
 
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const counts = await warmFeedCaches();
-    return NextResponse.json({ ok: true, ...counts, warmedAt: new Date().toISOString() }, {
+    const snapshot = await refreshMoviesSnapshot();
+    return NextResponse.json({ ok: true, items: snapshot?.itemCount ?? 0, refreshedAt: snapshot?.sourceFetchedAt }, {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {

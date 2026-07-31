@@ -5,6 +5,23 @@ import { hasGoogleTranslateKey, translateTexts } from "@/lib/googleTranslate";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
+const ALLOWED_ARTICLE_DOMAINS = [
+  "openai.com", "deepmind.google", "huggingface.co", "theverge.com", "technologyreview.com",
+  "techcrunch.com", "the-decoder.com", "blog.google", "nvidia.com", "anthropic.com",
+  "ycombinator.com", "arstechnica.com", "theregister.com", "9to5mac.com", "engadget.com",
+  "macrumors.com", "bleepingcomputer.com", "tomshardware.com", "spectrum.ieee.org",
+];
+
+function isAllowedArticleUrl(value: string) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return false;
+    return ALLOWED_ARTICLE_DOMAINS.some((domain) => url.hostname === domain || url.hostname.endsWith(`.${domain}`));
+  } catch {
+    return false;
+  }
+}
+
 function extractReadableContent(html: string): { content: string; image: string | null; author: string | null } {
   // Remove scripts, styles, nav, header, footer, aside
   const clean = html
@@ -81,9 +98,8 @@ async function fetchArticle(url: string) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const html = await res.text();
   const article = extractReadableContent(html);
-  if (!article.content || !hasGoogleTranslateKey()) {
-    return article;
-  }
+  if (!article.content) throw new Error("Zdroj neposkytl čitelný obsah článku");
+  if (!hasGoogleTranslateKey()) throw new Error("Český překladač není nakonfigurovaný");
 
   const paragraphs = article.content
     .split("\n\n")
@@ -93,15 +109,11 @@ async function fetchArticle(url: string) {
 
   if (paragraphs.length === 0) return article;
 
-  try {
-    const translated = await translateTexts(paragraphs);
-    return {
-      ...article,
-      content: translated.join("\n\n"),
-    };
-  } catch {
-    return article;
-  }
+  const translated = await translateTexts(paragraphs);
+  return {
+    ...article,
+    content: translated.join("\n\n"),
+  };
 }
 
 const getCachedArticle = unstable_cache(
@@ -113,8 +125,8 @@ const getCachedArticle = unstable_cache(
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const url = searchParams.get("url");
-  if (!url || !url.startsWith("http")) {
-    return NextResponse.json({ error: "Missing url" }, { status: 400 });
+  if (!url || !isAllowedArticleUrl(url)) {
+    return NextResponse.json({ error: "Nepovolený zdroj článku" }, { status: 400 });
   }
 
   try {

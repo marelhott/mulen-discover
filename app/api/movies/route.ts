@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { fetchSrrdb, fetchPredb, fetchScnsrcScene } from "@/lib/sceneSources";
 import { unstable_cache } from "next/cache";
 import { hasGoogleTranslateKey, translateText } from "@/lib/googleTranslate";
+import { readSnapshot, writeSnapshot } from "@/lib/snapshotStore";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -402,14 +403,6 @@ function deduplicateRawEntries(entries: any[]) {
   return Array.from(map.values());
 }
 
-const getCachedMoviesPage = unstable_cache(
-  async (page: number) => {
-    return buildMoviesPage(page, false);
-  },
-  ["movies-page-v9"],
-  { revalidate: 1800 }
-);
-
 const DOWNLOAD_SOURCES = new Set(["yts", "srrdb", "predb", "scnsrc"]);
 
 function hasDownloadRelease(movie: any): boolean {
@@ -424,7 +417,7 @@ function sceneReleaseTimestamp(movie: any): number {
   return dates.length > 0 ? Math.max(...dates) : 0;
 }
 
-// Good-quality online release: WEB-DL, WEBRip, BluRay, Remux
+// Good-quality verified release: WEB-DL, WEBRip, BluRay, Remux
 const VOD_QUALITY_RE = /web[-.]?dl|webrip|blu[-.]?ray|bdrip|remux/i;
 
 function isGoodQualityRelease(raw: any): boolean {
@@ -488,9 +481,9 @@ async function buildMoviesPage(page: number, forceFresh: boolean) {
     // Track which TMDB IDs came from discover (VOD date window)
     const vodDiscoverIds = new Set(tmdbVod.map((e: any) => e._tmdb_id));
 
-    // VOD: either has scene release OR is from the VOD date window
+    // Only explicitly observed releases belong to "Potvrzeně dostupné".
     const vod = deduped
-      .filter(m => hasDownloadRelease(m) || vodDiscoverIds.has(m.id))
+      .filter(m => hasDownloadRelease(m))
       .sort((a, b) => {
         // Scene releases first (verified download), then by popularity/date
         const aHasScene = hasDownloadRelease(a) ? 1 : 0;
@@ -504,6 +497,12 @@ async function buildMoviesPage(page: number, forceFresh: boolean) {
 
     const vodIds = new Set(vod.map((m: any) => m.id));
 
+    // TMDB's release date is useful, but is not evidence of online availability.
+    const recent = deduped
+      .filter(m => !vodIds.has(m.id) && vodDiscoverIds.has(m.id))
+      .sort((a, b) => getTimestamp(b.date_added) - getTimestamp(a.date_added))
+      .slice(0, MOVIES_PAGE_LIMIT);
+
     // Upcoming: future release date, not already in VOD
     const upcomingMovies = deduped
       .filter(m => {
@@ -516,6 +515,7 @@ async function buildMoviesPage(page: number, forceFresh: boolean) {
 
     return {
       vod,
+      recent,
       upcoming: upcomingMovies,
       page,
       hasMore: false,
@@ -523,18 +523,38 @@ async function buildMoviesPage(page: number, forceFresh: boolean) {
     };
 }
 
+type MoviesSnapshotData = Awaited<ReturnType<typeof buildMoviesPage>>;
+
+async function readMoviesSnapshot() {
+  return readSnapshot<MoviesSnapshotData>("movies");
+}
+
+export async function refreshMoviesSnapshot() {
+  const data = await buildMoviesPage(1, true);
+  return writeSnapshot("movies", data, data.vod.length + data.recent.length + data.upcoming.length);
+}
+
 // ── Main handler ─────────────────────────────────────────────────────────────
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const page = parseInt(searchParams.get("page") ?? "1");
-  const forceRefresh = searchParams.has("refresh");
-  const data = forceRefresh ? await buildMoviesPage(page, true) : await getCachedMoviesPage(page);
+  let snapshot = await readMoviesSnapshot();
+  if (!snapshot) snapshot = await refreshMoviesSnapshot();
+  if (!snapshot) {
+    return NextResponse.json({ error: "Český snapshot filmů zatím není připravený" }, { status: 503 });
+  }
+  if (Date.now() - new Date(snapshot.sourceFetchedAt).getTime() > 5 * 60_000) {
+    after(async () => { await refreshMoviesSnapshot(); });
+  }
+  const data = { ...snapshot.data, page, freshness: {
+    version: snapshot.version,
+    sourceFetchedAt: snapshot.sourceFetchedAt,
+    translatedAt: snapshot.translatedAt,
+  } };
   return NextResponse.json(data, {
     headers: {
-      "Cache-Control": forceRefresh
-        ? "no-store, max-age=0"
-        : "public, s-maxage=1800, stale-while-revalidate=3600",
+      "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
     },
   });
 }
