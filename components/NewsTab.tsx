@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 import Image from "next/image";
-import { RefreshCw, Loader2, Film, X, ChevronRight } from "lucide-react";
+import { RefreshCw, Loader2, Film, X, ChevronRight, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cs } from "date-fns/locale";
 import PersonModal from "./PersonModal";
@@ -122,6 +122,9 @@ function PersonSnippet({
 
 function ArticleModal({ article, onClose }: { article: NewsArticle; onClose: () => void }) {
   const [personId, setPersonId] = useState<number | null>(null);
+  const [content, setContent] = useState(article.body_cs);
+  const [loadingContent, setLoadingContent] = useState(true);
+  const [contentError, setContentError] = useState(false);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -135,6 +138,32 @@ function ArticleModal({ article, onClose }: { article: NewsArticle; onClose: () 
       unlockScroll();
     };
   }, [onClose, personId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    setContent(article.body_cs);
+    setLoadingContent(true);
+    setContentError(false);
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/article?url=${encodeURIComponent(article.link)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("Detail zdroj neposkytl");
+        const data = await response.json() as { content?: string };
+        if (!cancelled && data.content) setContent(data.content);
+      } catch {
+        if (!cancelled) setContentError(true);
+      } finally {
+        if (!cancelled) setLoadingContent(false);
+      }
+    })();
+
+    return () => { cancelled = true; controller.abort(); };
+  }, [article.link, article.body_cs]);
 
   return (
     <>
@@ -166,7 +195,22 @@ function ArticleModal({ article, onClose }: { article: NewsArticle; onClose: () 
             </div>
 
             <h2 className="mb-3 text-lg font-bold leading-snug text-[color:var(--foreground)] sm:text-xl">{article.title_cs}</h2>
-            <p className="text-sm leading-relaxed text-[color:var(--foreground)]">{article.body_cs}</p>
+            <div className="space-y-4">
+              {content.split("\n\n").slice(0, 36).map((paragraph, index) => (
+                <p key={index} className="text-sm leading-[1.75] text-[color:var(--foreground)]">{paragraph}</p>
+              ))}
+            </div>
+
+            {loadingContent && (
+              <p className="mt-5 flex items-center gap-2 text-xs text-[color:var(--muted)]">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Načítám celý český překlad…
+              </p>
+            )}
+            {contentError && (
+              <p className="mt-5 text-xs leading-relaxed text-[color:var(--muted)]">
+                Úplný text zdroj právě neposkytl; zobrazuji ověřený český perex.
+              </p>
+            )}
 
             {article.person && (
               <div className="mt-4">
@@ -174,6 +218,15 @@ function ArticleModal({ article, onClose }: { article: NewsArticle; onClose: () 
                 <PersonSnippet person={article.person} onClickPerson={setPersonId} />
               </div>
             )}
+
+            <a
+              href={article.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 flex items-center gap-1.5 text-xs font-medium text-[color:var(--accent)] hover:underline"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> Otevřít originál na {article.source}
+            </a>
           </div>
         </div>
       </div>

@@ -56,7 +56,8 @@ function sourceDomain(name: string): string {
 // ── Article reader modal ──────────────────────────────────────────────────────
 
 function ArticleModal({ article, onClose }: { article: FeedArticle; onClose: () => void }) {
-  const [content, setContent] = useState<string | null>(null);
+  const fallbackBody = article.summary_cs ?? article.summary;
+  const [content, setContent] = useState(fallbackBody);
   const [image, setImage] = useState<string | null>(article.image);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -70,10 +71,14 @@ function ArticleModal({ article, onClose }: { article: FeedArticle; onClose: () 
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/article?url=${encodeURIComponent(article.url)}`);
+        const res = await fetch(`/api/article?url=${encodeURIComponent(article.url)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         if (!res.ok) throw new Error();
         const data = await res.json();
         if (cancelled) return;
@@ -85,11 +90,10 @@ function ArticleModal({ article, onClose }: { article: FeedArticle; onClose: () 
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; controller.abort(); };
   }, [article.url, article.image]);
 
   const title = article.title_cs ?? article.title;
-  const fallbackBody = article.summary_cs ?? article.summary;
 
   return (
     <div
@@ -137,19 +141,28 @@ function ArticleModal({ article, onClose }: { article: FeedArticle; onClose: () 
             </h2>
 
             {/* Body */}
-            {loading ? (
+            {!content ? (
               <div className="flex items-center gap-2 text-sm text-[color:var(--muted)]">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Načítám článek…
               </div>
-            ) : error || !content ? (
-              <p className="text-[0.9rem] leading-relaxed text-[color:var(--foreground)]">{fallbackBody}</p>
             ) : (
               <div className="space-y-4">
-                {content.split("\n\n").slice(0, 30).map((para, i) => (
+                {content.split("\n\n").slice(0, 36).map((para, i) => (
                   <p key={i} className="text-[0.9rem] leading-[1.7] text-[color:var(--foreground)]">{para}</p>
                 ))}
               </div>
+            )}
+
+            {loading && content && (
+              <p className="mt-5 flex items-center gap-2 text-xs text-[color:var(--muted)]">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Načítám celý český překlad…
+              </p>
+            )}
+            {error && (
+              <p className="mt-5 text-xs leading-relaxed text-[color:var(--muted)]">
+                Úplný text zdroj právě neposkytl; zobrazuji ověřený český perex.
+              </p>
             )}
 
             {/* Open original */}

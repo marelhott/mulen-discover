@@ -10,6 +10,8 @@ const ALLOWED_ARTICLE_DOMAINS = [
   "techcrunch.com", "the-decoder.com", "blog.google", "nvidia.com", "anthropic.com",
   "ycombinator.com", "arstechnica.com", "theregister.com", "9to5mac.com", "engadget.com",
   "macrumors.com", "bleepingcomputer.com", "tomshardware.com", "spectrum.ieee.org",
+  "deadline.com", "variety.com", "hollywoodreporter.com", "indiewire.com", "screendaily.com",
+  "filmneweurope.com", "moviezone.cz",
 ];
 
 function isAllowedArticleUrl(value: string) {
@@ -20,6 +22,26 @@ function isAllowedArticleUrl(value: string) {
   } catch {
     return false;
   }
+}
+
+function decodeHtml(text: string) {
+  return text
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
+    .replace(/&hellip;/g, "...").replace(/&#\d+;/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractParagraphs(html: string) {
+  const paragraphs = [...html.matchAll(/<p(?:\s[^>]*)?>([\s\S]*?)<\/p>/gi)]
+    .map((match) => decodeHtml(match[1]))
+    .filter((paragraph) => paragraph.length >= 55)
+    .filter((paragraph) => !/^(advertisement|reklama|subscribe|sign up|read more|related:|copyright)/i.test(paragraph));
+
+  return Array.from(new Set(paragraphs)).slice(0, 36);
 }
 
 function extractReadableContent(html: string): { content: string; image: string | null; author: string | null } {
@@ -67,20 +89,14 @@ function extractReadableContent(html: string): { content: string; image: string 
     bodyHtml = paragraphs.map(m => m[1]).join("\n");
   }
 
-  // Strip remaining HTML tags and decode entities
-  const text = bodyHtml
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
-    .replace(/&hellip;/g, "...").replace(/&#\d+;/g, "")
-    .replace(/\s{3,}/g, "\n\n")
-    .trim();
-
-  // Split into paragraphs, filter noise
-  const paras = text
-    .split(/\n{2,}/)
-    .map(p => p.replace(/\s+/g, " ").trim())
-    .filter(p => p.length > 60); // drop short fragments (nav items, captions etc)
+  // Keep native paragraph boundaries; removing all tags first previously merged a
+  // full story into a tiny, unreadable excerpt in the modal.
+  let paras = extractParagraphs(bodyHtml);
+  if (paras.length === 0) paras = extractParagraphs(clean);
+  if (paras.length === 0) {
+    const text = decodeHtml(bodyHtml.replace(/<\/(?:p|div|section|h[1-6])>/gi, "\n\n"));
+    paras = text.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter((paragraph) => paragraph.length >= 55);
+  }
 
   return { content: paras.join("\n\n"), image, author };
 }
@@ -105,7 +121,7 @@ async function fetchArticle(url: string) {
     .split("\n\n")
     .map((paragraph) => paragraph.trim())
     .filter(Boolean)
-    .slice(0, 30);
+    .slice(0, 36);
 
   if (paragraphs.length === 0) return article;
 
@@ -118,7 +134,7 @@ async function fetchArticle(url: string) {
 
 const getCachedArticle = unstable_cache(
   async (url: string) => fetchArticle(url),
-  ["article-content-v2"],
+  ["article-content-v3"],
   { revalidate: 3600 }
 );
 
