@@ -539,12 +539,13 @@ export async function refreshMoviesSnapshot() {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const page = parseInt(searchParams.get("page") ?? "1");
+  const forceRefresh = searchParams.has("refresh");
   let snapshot = await readMoviesSnapshot();
   if (!snapshot) snapshot = await refreshMoviesSnapshot();
   if (!snapshot) {
     return NextResponse.json({ error: "Český snapshot filmů zatím není připravený" }, { status: 503 });
   }
-  if (Date.now() - new Date(snapshot.sourceFetchedAt).getTime() > 5 * 60_000) {
+  if (forceRefresh || Date.now() - new Date(snapshot.sourceFetchedAt).getTime() > 5 * 60_000) {
     after(async () => { await refreshMoviesSnapshot(); });
   }
   const data = { ...snapshot.data, page, freshness: {

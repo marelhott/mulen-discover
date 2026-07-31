@@ -5,6 +5,7 @@ import { readSnapshot, writeSnapshot } from "@/lib/snapshotStore";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+const MAX_FEED_AGE_HOURS = 36;
 
 // ── Source definitions with weights ──────────────────────────────────────────
 
@@ -106,6 +107,7 @@ async function fetchRss(source: FeedSource, limit = 8, fresh = false): Promise<F
       const summary = decodeEntities(rawSummary).slice(0, 400);
       const link = item.link?.["@_href"] ?? item.link?.["#text"] ?? item.link ?? source.siteUrl;
       const pubDate = item.pubDate ?? item.updated ?? item.published ?? null;
+      const publishedAt = pubDate ? new Date(pubDate).getTime() : NaN;
       return {
         id: String(item.guid?.["#text"] ?? item.guid ?? item.id ?? link),
         title,
@@ -114,11 +116,11 @@ async function fetchRss(source: FeedSource, limit = 8, fresh = false): Promise<F
         image: extractImage(item),
         source: source.name,
         sourceWeight: source.weight,
-        publishedAt: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+        publishedAt: Number.isFinite(publishedAt) ? new Date(publishedAt).toISOString() : "",
         clusterSize: 1,
         score: 0,
       };
-    }).filter(a => a.title && a.url);
+    }).filter(a => a.title && a.url && a.publishedAt);
   } catch {
     return [];
   }
@@ -245,7 +247,7 @@ function rankArticles(articles: FeedArticle[]): FeedArticle[] {
   return articles
     .map(a => {
       const ageHours = (now - new Date(a.publishedAt).getTime()) / 3_600_000;
-      const recency = Math.exp(-ageHours / 20);           // half-life ~20h
+      const recency = Math.exp(-ageHours / 6);            // half-life ~6h
       const clusterBonus = 1 + Math.log(a.clusterSize);   // logarithmic cluster boost
       const score = a.sourceWeight * recency * clusterBonus;
       return { ...a, score };
@@ -280,7 +282,11 @@ async function buildFeed(category: "ai" | "tech", fresh = false): Promise<FeedAr
   const allRaw = rawBatches.flat();
 
   // 2. Two-level dedup + clustering + ranking
-  const top = rankArticles(clusterAndDeduplicate(allRaw)).slice(0, 40);
+  const freshOnly = allRaw.filter((article) => {
+    const ageHours = (Date.now() - new Date(article.publishedAt).getTime()) / 3_600_000;
+    return ageHours >= -1 && ageHours <= MAX_FEED_AGE_HOURS;
+  });
+  const top = rankArticles(clusterAndDeduplicate(freshOnly)).slice(0, 40);
 
   // 3. OG image enrichment + translation in PARALLEL (biggest speedup)
   const [withImages, translations] = await Promise.all([
@@ -327,6 +333,7 @@ export async function GET(
   if (category !== "ai" && category !== "tech") {
     return NextResponse.json({ error: "Unknown category" }, { status: 400 });
   }
+  const forceRefresh = new URL(request.url).searchParams.has("refresh");
   let snapshot = await getFeedSnapshot(category);
   if (!snapshot) snapshot = await refreshFeedSnapshot(category);
   if (!snapshot) {
@@ -334,7 +341,9 @@ export async function GET(
   }
 
   const ageMs = Date.now() - new Date(snapshot.sourceFetchedAt).getTime();
-  if (ageMs > 5 * 60_000) {
+  // A snapshot is returned immediately. Manual refreshes queue a full source +
+  // translation pass after the response instead of making the UI wait for it.
+  if (forceRefresh || ageMs > 5 * 60_000) {
     after(async () => { await refreshFeedSnapshot(category); });
   }
 

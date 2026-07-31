@@ -9,6 +9,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
   const pageSize = Math.max(1, parseInt(searchParams.get("pageSize") ?? "30", 10) || 30);
+  const forceRefresh = searchParams.has("refresh");
   let snapshot = await readNewsSnapshot();
   if (!snapshot) snapshot = await refreshNewsSnapshot();
   if (!snapshot) {
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
     },
   };
 
-  if (Date.now() - new Date(snapshot.sourceFetchedAt).getTime() > 5 * 60_000) {
+  if (forceRefresh || Date.now() - new Date(snapshot.sourceFetchedAt).getTime() > 5 * 60_000) {
     after(async () => {
       await refreshNewsSnapshot();
     });

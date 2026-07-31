@@ -51,26 +51,21 @@ export default function MovieGrid() {
       });
       if (!res.ok) throw new Error("Chyba při načítání filmů");
       const data = await res.json();
-      if (!data.vod?.length) {
-        setHasMore(false);
-        movieCache.hasMore = false;
-      } else {
-        setVod((prev) => {
-          const next = mode === "replace" ? data.vod : [...prev, ...data.vod];
-          movieCache.vod = next;
-          return next;
-        });
-        if (p === 1) {
-          setRecent(data.recent ?? []);
-          movieCache.recent = data.recent ?? [];
-          setUpcoming(data.upcoming ?? []);
-          movieCache.upcoming = data.upcoming ?? [];
-        }
-        setPage(p);
-        setHasMore(data.hasMore ?? true);
-        movieCache.page = p;
-        movieCache.hasMore = data.hasMore ?? true;
+      setVod((prev) => {
+        const next = mode === "replace" ? (data.vod ?? []) : [...prev, ...(data.vod ?? [])];
+        movieCache.vod = next;
+        return next;
+      });
+      if (p === 1) {
+        setRecent(data.recent ?? []);
+        movieCache.recent = data.recent ?? [];
+        setUpcoming(data.upcoming ?? []);
+        movieCache.upcoming = data.upcoming ?? [];
       }
+      setPage(p);
+      setHasMore(data.hasMore ?? false);
+      movieCache.page = p;
+      movieCache.hasMore = data.hasMore ?? false;
       movieCache.hydrated = true;
       movieCache.fetchedAt = Date.now();
       try {
@@ -99,7 +94,11 @@ export default function MovieGrid() {
       const stored = window.localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as MovieCache;
-        if (Array.isArray(parsed.vod) && parsed.vod.length > 0) {
+        if (
+          (Array.isArray(parsed.vod) && parsed.vod.length > 0)
+          || (Array.isArray(parsed.recent) && parsed.recent.length > 0)
+          || (Array.isArray(parsed.upcoming) && parsed.upcoming.length > 0)
+        ) {
           movieCache.vod = parsed.vod;
           movieCache.recent = parsed.recent ?? [];
           movieCache.upcoming = parsed.upcoming ?? [];
@@ -162,15 +161,15 @@ export default function MovieGrid() {
 
   return (
     <div>
-      {/* Online section */}
+      {/* Latest titles lead the experience; verified releases are supplementary. */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2
           className="text-[1.1rem] font-semibold text-[color:var(--foreground)]"
           style={{ fontFamily: "var(--font-serif), Georgia, serif" }}
         >
-          Potvrzeně dostupné
-          {vod.length > 0 && (
-            <span className="ml-2 text-[0.85rem] font-normal text-[color:var(--muted)]">{vod.length} titulů</span>
+          Nejnovější filmy
+          {recent.length > 0 && (
+            <span className="ml-2 text-[0.85rem] font-normal text-[color:var(--muted)]">{recent.length} titulů</span>
           )}
         </h2>
         <button
@@ -196,17 +195,13 @@ export default function MovieGrid() {
       )}
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-        {vod.map(movie => <MovieCard key={`${movie.id}-${movie.imdb_code}`} movie={movie} />)}
+        {recent.map(movie => <MovieCard key={`${movie.id}-${movie.imdb_code}`} movie={movie} />)}
         {loading && Array.from({ length: 14 }).map((_, i) => (
           <div key={`sk-${i}`} className="aspect-[2/3] animate-pulse overflow-hidden rounded-xl border border-[color:var(--line)] bg-[color:var(--surface)]" />
         ))}
       </div>
 
-      {!loading && vod.length === 0 && (
-        <p className="py-6 text-sm text-[color:var(--muted)]">Právě nemáme potvrzený nový release. Nezaměňujeme datum premiéry za online dostupnost.</p>
-      )}
-
-      {!loading && hasMore && vod.length > 0 && (
+      {!loading && hasMore && recent.length > 0 && (
         <div className="flex justify-center mt-10">
           <button onClick={() => { const n = page + 1; void loadMovies(n, "append"); }}
             className="min-h-11 rounded-xl border border-[color:var(--line)] bg-[color:var(--surface)] px-8 py-3 font-medium text-[color:var(--foreground)] transition-colors hover:bg-[color:var(--surface-muted)]">
@@ -215,22 +210,22 @@ export default function MovieGrid() {
         </div>
       )}
 
-      {loading && vod.length > 0 && (
+      {loading && recent.length > 0 && (
         <div className="flex justify-center mt-8">
           <Loader2 className="w-6 h-6 animate-spin text-[color:var(--muted)]" />
         </div>
       )}
 
-      {recent.length > 0 && (
+      {vod.length > 0 && (
         <div className="mt-12">
           <h2
             className="mb-4 text-[1.1rem] font-semibold text-[color:var(--foreground)]"
             style={{ fontFamily: "var(--font-serif), Georgia, serif" }}
           >
-            Nedávno vydané
+            Potvrzeně dostupné
           </h2>
           <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-            {recent.map(movie => <MovieCard key={`${movie.id}-${movie.imdb_code}`} movie={movie} />)}
+            {vod.map(movie => <MovieCard key={`${movie.id}-${movie.imdb_code}`} movie={movie} />)}
           </div>
         </div>
       )}

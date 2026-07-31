@@ -10,7 +10,7 @@ const RAW_NEWS_LIMIT = 120;
 const TRANSLATION_BATCH_SIZE = 10;
 const OG_IMAGE_ENRICH_LIMIT = 40;
 const ALLOWED_PERSON_DEPARTMENTS = new Set(["Acting", "Directing"]);
-const MAX_ARTICLE_AGE_DAYS = 21;
+const MAX_ARTICLE_AGE_HOURS = 36;
 
 const NAMED_ENTITIES: Record<string, string> = {
   amp: "&",
@@ -311,8 +311,9 @@ function pickBestImage(candidates: ImageCandidate[]): {
 }
 
 function articleAgeIsFresh(timestamp: number) {
-  if (!timestamp) return true;
-  return Date.now() - timestamp <= MAX_ARTICLE_AGE_DAYS * 24 * 60 * 60 * 1000;
+  if (!timestamp) return false;
+  const ageMs = Date.now() - timestamp;
+  return ageMs >= -60 * 60 * 1000 && ageMs <= MAX_ARTICLE_AGE_HOURS * 60 * 60 * 1000;
 }
 
 async function fetchRSS(source: SourceMeta): Promise<RawArticle[]> {
@@ -419,11 +420,7 @@ function categoryFromArticle(article: RawArticle): NewsCategory {
 function recencyBonus(timestamp: number) {
   if (!timestamp) return 0;
   const hours = (Date.now() - timestamp) / 36e5;
-  if (hours <= 6) return 24;
-  if (hours <= 18) return 18;
-  if (hours <= 36) return 12;
-  if (hours <= 72) return 6;
-  return 0;
+  return Math.max(0, 100 * Math.exp(-Math.max(0, hours) / 6));
 }
 
 function baseCategoryScore(category: NewsCategory) {
@@ -494,8 +491,8 @@ function rankArticles(articles: RawArticle[]) {
     const entityHints = extractEntityHints(article.title);
     const bestImage = pickBestImage(article.imageCandidates);
     const interestScore =
-      baseCategoryScore(category)
-      + recencyBonus(article.publishedAt)
+      recencyBonus(article.publishedAt)
+      + baseCategoryScore(category) * 0.15
       + Math.min(entityHints.length, 2) * 5
       + (article.fullText.length > 220 ? 4 : 0)
       + (bestImage.imageQuality === "high" ? 8 : bestImage.imageQuality === "medium" ? 3 : 0);
