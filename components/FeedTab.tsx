@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Loader2, RefreshCw, X, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cs } from "date-fns/locale";
+import { editorialFallbackImage } from "@/lib/editorialImages";
 
 export type FeedCategory = "ai" | "tech";
 
@@ -34,23 +35,6 @@ function storageKey(c: FeedCategory) { return `movie-releases:feed-${c}:v2`; }
 function timeAgo(value: string) {
   try { return formatDistanceToNow(new Date(value), { addSuffix: true, locale: cs }); }
   catch { return ""; }
-}
-
-// Source domain → logo fallback
-function sourceDomain(name: string): string {
-  const map: Record<string, string> = {
-    "OpenAI Blog": "openai.com", "Google DeepMind": "deepmind.google",
-    "Hugging Face": "huggingface.co", "The Verge AI": "theverge.com",
-    "MIT Tech Review": "technologyreview.com", "TechCrunch AI": "techcrunch.com",
-    "The Decoder": "the-decoder.com", "Google AI Blog": "blog.google",
-    "NVIDIA Blog": "nvidia.com",
-    "Hacker News": "news.ycombinator.com", "Ars Technica": "arstechnica.com",
-    "The Verge": "theverge.com", "The Register": "theregister.com",
-    "9to5Mac": "9to5mac.com", "Engadget": "engadget.com",
-    "MacRumors": "macrumors.com", "BleepingComputer": "bleepingcomputer.com",
-    "Tom's Hardware": "tomshardware.com", "IEEE Spectrum": "spectrum.ieee.org",
-  };
-  return map[name] ?? "";
 }
 
 // ── Article reader modal ──────────────────────────────────────────────────────
@@ -185,13 +169,15 @@ function ArticleModal({ article, onClose }: { article: FeedArticle; onClose: () 
 // ── Feed card ─────────────────────────────────────────────────────────────────
 
 function FeedCard({ article, onClick }: { article: FeedArticle; onClick: () => void }) {
-  const imgSrc = article.image;
   const [imgError, setImgError] = useState(false);
 
   const title = article.title_cs ?? article.title;
   const body = article.summary_cs ?? article.summary;
-  const domain = sourceDomain(article.source);
-  const logoUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : null;
+  const topic = article.source.includes("AI") || article.source === "OpenAI Blog" || article.source === "Google DeepMind"
+    ? "ai"
+    : "technology";
+  const fallbackImage = editorialFallbackImage(topic, article.id);
+  const imgSrc = !imgError && article.image ? article.image : fallbackImage;
 
   return (
     <article
@@ -200,36 +186,14 @@ function FeedCard({ article, onClick }: { article: FeedArticle; onClick: () => v
     >
       {/* 16:9 image */}
       <div className="relative w-full overflow-hidden bg-[color:var(--surface-muted)]" style={{ aspectRatio: "16/9" }}>
-        {imgSrc && !imgError ? (
-          <Image
-            src={imgSrc}
-            alt={title}
-            fill
-            className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-            onError={() => setImgError(true)}
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-          />
-        ) : (
-          /* Fallback: source logo centred on muted bg */
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-            {logoUrl ? (
-              <Image
-                src={logoUrl}
-                alt={article.source}
-                width={32}
-                height={32}
-                className="h-8 w-8 rounded-md opacity-50"
-                unoptimized
-              />
-            ) : (
-              <svg className="h-7 w-7 text-[color:var(--faint)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            )}
-            <span className="text-[10px] font-medium text-[color:var(--faint)]">{article.source}</span>
-          </div>
-        )}
+        <Image
+          src={imgSrc}
+          alt={title}
+          fill
+          className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+          onError={() => setImgError(true)}
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+        />
         {/* Cluster badge */}
         {article.clusterSize > 1 && (
           <span className="absolute bottom-2 right-2 rounded-full bg-[rgba(27,24,18,0.6)] px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">

@@ -8,6 +8,7 @@ import { formatDistanceToNow } from "date-fns";
 import { cs } from "date-fns/locale";
 import PersonModal from "./PersonModal";
 import type { NewsArticle, NewsResponse, PersonSnippet as PersonSnippetData } from "@/types/news";
+import { editorialFallbackImage } from "@/lib/editorialImages";
 
 const PAGE_SIZE = 30;
 const SOURCE_FILTERS = [
@@ -125,6 +126,7 @@ function ArticleModal({ article, onClose }: { article: NewsArticle; onClose: () 
   const [content, setContent] = useState(article.body_cs);
   const [loadingContent, setLoadingContent] = useState(true);
   const [contentError, setContentError] = useState(false);
+  const coverImage = article.image ?? editorialFallbackImage("film", article.link);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -179,11 +181,9 @@ function ArticleModal({ article, onClose }: { article: NewsArticle; onClose: () 
             <X className="h-5 w-5" />
           </button>
 
-          {article.image && (
-            <div className="relative h-44 w-full overflow-hidden rounded-t-[1.75rem] sm:h-56 sm:rounded-t-2xl">
-              <Image src={article.image} alt="" fill className="object-cover" sizes="(max-width: 640px) 100vw, 672px" />
-            </div>
-          )}
+          <div className="relative h-44 w-full overflow-hidden rounded-t-[1.75rem] sm:h-56 sm:rounded-t-2xl">
+            <Image src={coverImage} alt="" fill className="object-cover" sizes="(max-width: 640px) 100vw, 672px" />
+          </div>
 
           <div className="p-4 sm:p-6">
             <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -238,7 +238,8 @@ function ArticleModal({ article, onClose }: { article: NewsArticle; onClose: () 
 function NewsCard({ article, onClick }: { article: NewsArticle; onClick: () => void }) {
   const [imgError, setImgError] = useState(false);
   const [personId, setPersonId] = useState<number | null>(null);
-  const hasImage = Boolean(article.image && !imgError);
+  const fallbackImage = editorialFallbackImage("film", article.link);
+  const imageSrc = !imgError && article.image ? article.image : fallbackImage;
 
   return (
     <>
@@ -249,20 +250,14 @@ function NewsCard({ article, onClick }: { article: NewsArticle; onClick: () => v
       >
         {/* Image — 16:9 ratio (menší) */}
         <div className="relative w-full overflow-hidden bg-[color:var(--surface-muted)]" style={{ aspectRatio: "16/9" }}>
-          {hasImage ? (
-            <Image
-              src={article.image!}
-              alt=""
-              fill
-              className="object-cover transition-transform duration-500 ease-in-out group-hover:scale-[1.04]"
-              onError={() => setImgError(true)}
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <span className="text-xs text-[color:var(--faint)]">{article.source}</span>
-            </div>
-          )}
+          <Image
+            src={imageSrc}
+            alt=""
+            fill
+            className="object-cover transition-transform duration-500 ease-in-out group-hover:scale-[1.04]"
+            onError={() => setImgError(true)}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          />
         </div>
 
         {/* Text area */}

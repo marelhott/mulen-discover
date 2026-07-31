@@ -1,6 +1,8 @@
 import { after, NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { XMLParser } from "fast-xml-parser";
 import { hasGoogleTranslateKey, translateTexts } from "@/lib/googleTranslate";
+import { editorialFallbackImage } from "@/lib/editorialImages";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshotStore";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +71,10 @@ function decodeEntities(str: string): string {
     .replace(/<[^>]+>/g, "")
     .replace(/<[^>]*$/g, "")
     .trim();
+}
+
+function isUsableArticleImage(value: string | null | undefined) {
+  return Boolean(value && value.startsWith("http") && !/(?:logo|icon|avatar|headshot|thumb|thumbnail)/i.test(value));
 }
 
 function extractImage(item: any): string | null {
@@ -156,20 +162,30 @@ async function fetchOgImage(url: string): Promise<string | null> {
             ?? html.match(/<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i)
             ?? html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image(?::src)?["']/i);
     const u = og?.[1];
-    return u?.startsWith("http") ? u : null;
+    return isUsableArticleImage(u) ? u! : null;
   } catch {
     return null;
   }
 }
 
-async function enrichImages(articles: FeedArticle[]): Promise<FeedArticle[]> {
-  const missing = articles.filter(a => !a.image);
-  // Only top 8 to stay fast — rest get source logo fallback on client
+const getCachedOgImage = unstable_cache(
+  async (url: string) => fetchOgImage(url),
+  ["feed-og-image-v2"],
+  { revalidate: 86400 }
+);
+
+async function enrichImages(category: "ai" | "tech", articles: FeedArticle[]): Promise<FeedArticle[]> {
+  // RSS thumbnails are often tiny. Prefer publisher OG artwork for every card;
+  // missing publisher art gets a full-resolution editorial image, never a logo.
   const results = await Promise.all(
-    missing.slice(0, 8).map(a => fetchOgImage(a.url).then(image => ({ url: a.url, image })))
+    articles.map(a => getCachedOgImage(a.url).then(image => ({ url: a.url, image })))
   );
   const map = new Map(results.map(r => [r.url, r.image]));
-  return articles.map(a => ({ ...a, image: a.image ?? map.get(a.url) ?? null }));
+  const topic = category === "ai" ? "ai" : "technology";
+  return articles.map(a => ({
+    ...a,
+    image: map.get(a.url) ?? (isUsableArticleImage(a.image) ? a.image : null) ?? editorialFallbackImage(topic, a.id),
+  }));
 }
 
 // ── Two-level deduplication + clustering ─────────────────────────────────────
@@ -290,7 +306,7 @@ async function buildFeed(category: "ai" | "tech", fresh = false): Promise<FeedAr
 
   // 3. OG image enrichment + translation in PARALLEL (biggest speedup)
   const [withImages, translations] = await Promise.all([
-    enrichImages(top),
+    enrichImages(category, top),
     translateBatch(top),
   ]);
 

@@ -1,6 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import { unstable_cache } from "next/cache";
 import { hasGoogleTranslateKey, translateTexts } from "@/lib/googleTranslate";
+import { editorialFallbackImage } from "@/lib/editorialImages";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshotStore";
 
 const RSS_ITEMS_PER_SOURCE = 18;
@@ -641,22 +642,35 @@ const getCachedOgImage = unstable_cache(
   { revalidate: 86400 }
 );
 
-async function enrichClusterImages(clusters: ClusteredArticle[]) {
+async function enrichClusterImages(clusters: ClusteredArticle[]): Promise<ClusteredArticle[]> {
   return Promise.all(
     clusters.map(async (cluster, index) => {
-      if (index >= OG_IMAGE_ENRICH_LIMIT) return cluster;
-      if (cluster.imageQuality === "high") return cluster;
-      const fallback = await getCachedOgImage(cluster.lead.link);
-      if (!fallback) return cluster;
-      const picked = pickBestImage([
+      const ogImage = index < OG_IMAGE_ENRICH_LIMIT
+        ? await getCachedOgImage(cluster.lead.link)
+        : null;
+      const publisherImage = pickBestImage([
         ...(cluster.lead.imageCandidates ?? []),
-        fallback,
+        ...(ogImage ? [ogImage] : []),
       ]);
-      if (!picked.image) return cluster;
+      // A relevant publisher image always beats a generic cover. The generic
+      // image exists solely for stories with no usable publisher photography.
+      if (publisherImage.image && !/(?:logo|icon|avatar|headshot|thumb|thumbnail)/i.test(publisherImage.image)) {
+        return {
+          ...cluster,
+          image: publisherImage.image,
+          imageQuality: publisherImage.imageQuality,
+        };
+      }
+      const fallback: ImageCandidate = {
+        url: editorialFallbackImage("film", cluster.lead.link),
+        width: 1600,
+        height: 900,
+        origin: "og",
+      };
       return {
         ...cluster,
-        image: picked.image,
-        imageQuality: picked.imageQuality,
+        image: fallback.url,
+        imageQuality: "high" as const,
       };
     })
   );
