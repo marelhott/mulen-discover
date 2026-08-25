@@ -420,13 +420,10 @@ export default function NewsTab() {
     void loadPage(1, "replace");
   }, [loadPage]);
 
+  // Refresh only when the user actually opens the app again. No background
+  // polling: an idle tab must stay idle instead of paying for an LLM refresh
+  // every minute around the clock.
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      if (!newsCache.hydrated) return;
-      if (Date.now() - newsCache.fetchedAt < CACHE_TTL_MS) return;
-      void loadPage(1, "replace", { forceRefresh: true });
-    }, 60_000);
-
     const onVisibility = () => {
       if (document.visibilityState !== "visible") return;
       if (!newsCache.hydrated) return;
@@ -436,7 +433,6 @@ export default function NewsTab() {
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [loadPage]);

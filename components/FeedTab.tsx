@@ -272,11 +272,9 @@ export default function FeedTab({ category }: { category: FeedCategory }) {
     // published snapshot in the background.
     void load();
 
-    const interval = window.setInterval(() => {
-      if (Date.now() - cache.fetchedAt < CACHE_TTL_MS) return;
-      void load(true);
-    }, 60_000);
-
+    // Refresh only when the user actually opens the app again. No background
+    // polling: an idle tab must stay idle instead of paying for an LLM refresh
+    // every minute around the clock.
     const onVisibility = () => {
       if (document.visibilityState !== "visible") return;
       if (Date.now() - cache.fetchedAt < CACHE_TTL_MS) return;
@@ -285,7 +283,6 @@ export default function FeedTab({ category }: { category: FeedCategory }) {
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [load, category, cache]);

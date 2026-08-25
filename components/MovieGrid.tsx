@@ -119,13 +119,10 @@ export default function MovieGrid() {
     void loadMovies(1, "replace");
   }, [loadMovies]);
 
+  // Refresh only when the user actually opens the app again. No background
+  // polling: an idle tab must stay idle instead of paying for an LLM refresh
+  // every minute around the clock.
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      if (!movieCache.hydrated) return;
-      if (Date.now() - movieCache.fetchedAt < CACHE_TTL_MS) return;
-      void loadMovies(1, "replace");
-    }, 60_000);
-
     const onVisibility = () => {
       if (document.visibilityState !== "visible") return;
       if (!movieCache.hydrated) return;
@@ -135,7 +132,6 @@ export default function MovieGrid() {
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [loadMovies]);
