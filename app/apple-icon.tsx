@@ -17,59 +17,42 @@ export default function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#f5f1e8",
+          background: "#09241d",
+          borderRadius: 42,
         }}
       >
         <div
           style={{
-            width: 152,
-            height: 152,
-            borderRadius: 40,
-            background: "#1d2a24",
+            width: 130,
+            height: 130,
             display: "flex",
             position: "relative",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: "inset 0 0 0 4px rgba(255,253,248,0.12)",
+            border: "9px solid #64e7bc",
+            borderRadius: 999,
+            boxShadow: "0 0 36px rgba(100,231,188,0.34)",
           }}
         >
           <div
             style={{
+              width: 56,
+              height: 56,
               position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 40,
-              borderTopLeftRadius: 40,
-              borderTopRightRadius: 40,
-              background: "#0f9f76",
+              background: "#f7fff9",
+              transform: "rotate(45deg)",
+              borderRadius: 8,
             }}
           />
           <div
             style={{
+              width: 22,
+              height: 22,
               position: "absolute",
-              top: 13,
-              left: 28,
-              display: "flex",
-              gap: 12,
+              borderRadius: 999,
+              background: "#0d6552",
             }}
-          >
-            <div style={{ width: 8, height: 8, borderRadius: 999, background: "#f5f1e8" }} />
-            <div style={{ width: 8, height: 8, borderRadius: 999, background: "#f5f1e8" }} />
-            <div style={{ width: 8, height: 8, borderRadius: 999, background: "#f5f1e8" }} />
-          </div>
-          <div
-            style={{
-              marginTop: 18,
-              color: "#fffdf8",
-              fontSize: 70,
-              fontWeight: 700,
-              letterSpacing: "-0.08em",
-              fontFamily: "sans-serif",
-            }}
-          >
-            MR
-          </div>
+          />
         </div>
       </div>
     ),

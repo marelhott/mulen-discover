@@ -17,59 +17,42 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#f5f1e8",
+          background: "#09241d",
+          borderRadius: 16,
         }}
       >
         <div
           style={{
-            width: 54,
-            height: 54,
-            borderRadius: 16,
-            background: "#1d2a24",
+            width: 46,
+            height: 46,
             display: "flex",
             position: "relative",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: "inset 0 0 0 2px rgba(255,253,248,0.12)",
+            border: "3px solid #64e7bc",
+            borderRadius: 999,
+            boxShadow: "0 0 14px rgba(100,231,188,0.34)",
           }}
         >
           <div
             style={{
+              width: 19,
+              height: 19,
               position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 14,
-              borderTopLeftRadius: 16,
-              borderTopRightRadius: 16,
-              background: "#0f9f76",
+              background: "#f7fff9",
+              transform: "rotate(45deg)",
+              borderRadius: 3,
             }}
           />
           <div
             style={{
+              width: 8,
+              height: 8,
               position: "absolute",
-              top: 4,
-              left: 10,
-              display: "flex",
-              gap: 6,
+              borderRadius: 999,
+              background: "#0d6552",
             }}
-          >
-            <div style={{ width: 4, height: 4, borderRadius: 999, background: "#f5f1e8" }} />
-            <div style={{ width: 4, height: 4, borderRadius: 999, background: "#f5f1e8" }} />
-            <div style={{ width: 4, height: 4, borderRadius: 999, background: "#f5f1e8" }} />
-          </div>
-          <div
-            style={{
-              marginTop: 10,
-              color: "#fffdf8",
-              fontSize: 24,
-              fontWeight: 700,
-              letterSpacing: "-0.05em",
-              fontFamily: "sans-serif",
-            }}
-          >
-            MR
-          </div>
+          />
         </div>
       </div>
     ),
