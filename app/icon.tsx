@@ -17,7 +17,7 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#09241d",
+          background: "#fff8ef",
           borderRadius: 16,
         }}
       >
@@ -29,9 +29,9 @@ export default function Icon() {
             position: "relative",
             alignItems: "center",
             justifyContent: "center",
-            border: "3px solid #64e7bc",
+            border: "3px solid #f5bd82",
             borderRadius: 999,
-            boxShadow: "0 0 14px rgba(100,231,188,0.34)",
+            boxShadow: "0 0 14px rgba(249,115,22,0.2)",
           }}
         >
           <div
@@ -39,7 +39,7 @@ export default function Icon() {
               width: 19,
               height: 19,
               position: "absolute",
-              background: "#f7fff9",
+              background: "#f97316",
               transform: "rotate(45deg)",
               borderRadius: 3,
             }}
@@ -50,7 +50,7 @@ export default function Icon() {
               height: 8,
               position: "absolute",
               borderRadius: 999,
-              background: "#0d6552",
+              background: "#fff8ef",
             }}
           />
         </div>
