@@ -76,8 +76,8 @@ type VerifyResult = {
 
 async function verifySource(
   source: { name: string; url: string; topic: string },
-  checkClaude: boolean,
-  anthropicKey?: string
+  checkAI: boolean,
+  openRouterKey?: string
 ): Promise<VerifyResult> {
   const issues: string[] = [];
   const t0 = Date.now();
@@ -146,26 +146,25 @@ async function verifySource(
       if (title) sampleTitles.push(title);
     }
 
-    // Claude relevance check
-    if (checkClaude && anthropicKey && sampleTitles.length >= 3) {
+    // OpenRouter relevance check
+    if (checkAI && openRouterKey && sampleTitles.length >= 3) {
       try {
-        const { default: Anthropic } = await import("@anthropic-ai/sdk");
-        const client = new Anthropic({ apiKey: anthropicKey });
-        const msg = await client.messages.create({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 120,
-          messages: [{
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${openRouterKey}`, "Content-Type": "application/json", "X-Title": "Mulen Discover" },
+          body: JSON.stringify({ model: "google/gemini-2.5-flash", max_tokens: 120, response_format: { type: "json_object" }, messages: [{
             role: "user",
             content: `Is this RSS feed topically relevant to "${source.topic}"? Reply with JSON: {"relevant":true/false,"comment":"<10 words why>"}\n\nSample titles:\n${sampleTitles.slice(0,5).map((t,i)=>`${i+1}. ${t}`).join("\n")}`,
-          }],
+          }]}),
         });
-        const raw = msg.content[0].type === "text" ? msg.content[0].text : "{}";
+        const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+        const raw = payload.choices?.[0]?.message?.content ?? "{}";
         const match = raw.match(/\{[\s\S]*\}/);
         if (match) {
           const parsed = JSON.parse(match[0]);
           claudeRelevant = parsed.relevant ?? null;
           claudeComment = parsed.comment;
-          if (claudeRelevant === false) issues.push(`Claude: not relevant — ${claudeComment}`);
+          if (claudeRelevant === false) issues.push(`AI: not relevant — ${claudeComment}`);
         }
       } catch {
         claudeRelevant = null;
@@ -221,7 +220,7 @@ function printResult(r: VerifyResult) {
 
 async function main() {
   const args = process.argv.slice(2);
-  const checkClaude = args.includes("--claude");
+  const checkClaude = args.includes("--claude"); // compatibility CLI alias
   const catIdx = args.indexOf("--category");
   const categoryArg = catIdx !== -1 ? args[catIdx + 1] : undefined;
   const urlIdx = args.indexOf("--url");
@@ -229,9 +228,9 @@ async function main() {
   const topicIdx = args.indexOf("--topic");
   const customTopic = topicIdx !== -1 ? args[topicIdx + 1] : undefined;
 
-  const anthropicKey = process.env.MOVIE_ANTHROPIC_KEY ?? process.env.ANTHROPIC_API_KEY;
-  if (checkClaude && !anthropicKey) {
-    console.warn(yellow("⚠ --claude flag set but no MOVIE_ANTHROPIC_KEY in environment. Skipping AI check."));
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  if (checkClaude && !openRouterKey) {
+    console.warn(yellow("⚠ --claude flag set but no OPENROUTER_API_KEY in environment. Skipping AI check."));
   }
 
   let sources: { name: string; url: string; topic: string }[];
@@ -249,7 +248,7 @@ async function main() {
   console.log(bold(`\n🔍 Verifying ${sources.length} RSS sources…`) + (checkClaude ? " (+ Claude relevance)" : ""));
   console.log(dim("─".repeat(60)));
 
-  const results = await Promise.all(sources.map(s => verifySource(s, checkClaude && !!anthropicKey, anthropicKey)));
+  const results = await Promise.all(sources.map(s => verifySource(s, checkClaude && !!openRouterKey, openRouterKey)));
 
   for (const r of results) printResult(r);
 

@@ -84,89 +84,18 @@ async function translateWithOpenRouter(texts: string[], options: TranslationOpti
   throw lastError instanceof Error ? lastError : new Error("OpenRouter překlad selhal");
 }
 
-async function translateWithGoogle(texts: string[], options: TranslationOptions): Promise<string[]> {
-  const key = process.env.GOOGLE_TRANSLATE_API_KEY || process.env.GOOGLE_CLOUD_TRANSLATE_API_KEY;
-  if (!key) throw new Error("Google Translate klíč není nastavený");
-
-  const result = [...texts];
-  await Promise.all(chunk(texts.map((text, index) => ({ text, index })), MAX_BATCH_ITEMS).map(async (batch) => {
-    const body = new URLSearchParams();
-    body.set("target", options.target ?? "cs");
-    body.set("source", options.source ?? "en");
-    body.set("format", "text");
-    for (const item of batch) body.append("q", item.text);
-    const response = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${key}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-      body: body.toString(),
-      signal: AbortSignal.timeout(15_000),
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      const detail = await response.text();
-      throw new Error(`Google Translate ${response.status}: ${detail.slice(0, 240)}`);
-    }
-    const payload = await response.json() as { data?: { translations?: Array<{ translatedText?: string }> } };
-    const translated = payload.data?.translations ?? [];
-    for (let index = 0; index < batch.length; index++) result[batch[index].index] = clean(translated[index]?.translatedText);
-  }));
-  assertCzechResults(texts, result);
-  return result;
-}
-
-async function translateWithGemini(texts: string[], options: TranslationOptions): Promise<string[]> {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new Error("GEMINI_API_KEY není nastavený");
-  const model = process.env.GEMINI_TRANSLATION_MODEL || "gemini-2.5-flash-lite";
-  const prompt = `Přelož všechny texty z ${options.source ?? "en"} do ${options.target ?? "cs"}. Zachovej vlastní jména, značky, URL a čísla. Nezkracuj. Vrať výhradně validní JSON ve tvaru {"translations":["...", ...]} ve stejném pořadí.\n\n${JSON.stringify(texts)}`;
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0 } }),
-      signal: AbortSignal.timeout(25_000),
-    }
-  );
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Gemini ${response.status}: ${detail.slice(0, 240)}`);
-  }
-  const payload = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  const content = payload.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!content) throw new Error("Gemini vrátil prázdnou odpověď");
-  const parsed = JSON.parse(jsonrepair(content)) as { translations?: unknown[] };
-  const translated = (parsed.translations ?? []).map(clean);
-  assertCzechResults(texts, translated);
-  return translated;
-}
-
 export function hasTranslationProvider() {
-  return Boolean(process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_TRANSLATE_API_KEY || process.env.GOOGLE_CLOUD_TRANSLATE_API_KEY);
+  return Boolean(process.env.OPENROUTER_API_KEY);
 }
 
 export async function translateTexts(texts: string[], options: TranslationOptions = {}): Promise<string[]> {
   if (texts.length === 0) return [];
-  if (!hasTranslationProvider()) throw new Error("Není nakonfigurovaný žádný překladač");
+  if (!hasTranslationProvider()) throw new Error("OPENROUTER_API_KEY není nastavený");
   const indexed = texts.map((text, index) => ({ text: clean(text), index })).filter((item) => item.text.length > 0);
   if (indexed.length === 0) return texts.map(() => "");
 
   const translate = async (input: string[]) => {
-    if (process.env.OPENROUTER_API_KEY) {
-      try {
-        return await translateWithOpenRouter(input, options);
-      } catch (openRouterError) {
-        if (!process.env.GOOGLE_TRANSLATE_API_KEY && !process.env.GOOGLE_CLOUD_TRANSLATE_API_KEY) throw openRouterError;
-      }
-    }
-    if (process.env.GEMINI_API_KEY) {
-      try {
-        return await translateWithGemini(input, options);
-      } catch (geminiError) {
-        if (!process.env.GOOGLE_TRANSLATE_API_KEY && !process.env.GOOGLE_CLOUD_TRANSLATE_API_KEY) throw geminiError;
-      }
-    }
-    return translateWithGoogle(input, options);
+    return translateWithOpenRouter(input, options);
   };
 
   const translated = await translate(indexed.map((item) => item.text));
