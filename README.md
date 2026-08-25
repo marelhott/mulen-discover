@@ -1,4 +1,4 @@
-# Film a novinky
+# Mulen Discover
 
 Český přehled AI, technologií, filmových novinek a ověřených releasů. Veřejné API čte hotové snapshoty z privátního Vercel Blob úložiště; cron každých pět minut stáhne zdroje, přeloží jen nové položky a atomicky publikuje novou verzi.
 

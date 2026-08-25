@@ -22,18 +22,18 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Film a novinky",
-  description: "Filmové novinky, nové tituly a ověřené releasy na jednom místě.",
+  title: "Mulen Discover",
+  description: "Český přehled AI, technologií, filmových novinek a nových titulů.",
   openGraph: {
-    title: "Film a novinky",
-    description: "Filmové novinky, nové tituly a ověřené releasy na jednom místě.",
+    title: "Mulen Discover",
+    description: "Český přehled AI, technologií, filmových novinek a nových titulů.",
     type: "website",
     url: siteUrl,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Film a novinky",
-    description: "Filmové novinky, nové tituly a ověřené releasy na jednom místě.",
+    title: "Mulen Discover",
+    description: "Český přehled AI, technologií, filmových novinek a nových titulů.",
   },
 };
 
