@@ -1,4 +1,4 @@
-export type EditorialImageTopic = "ai" | "technology" | "film";
+export type EditorialImageTopic = "ai" | "technology" | "games" | "film";
 
 // These are deliberately photographic editorial fallbacks, not source logos.
 // The URL parameters ask the image CDN for a 1600×900 asset so cards never
@@ -13,6 +13,11 @@ const FALLBACK_SOURCES: Record<EditorialImageTopic, string[]> = {
     "https://images.unsplash.com/photo-1519389950473-47ba0277781c",
     "https://images.unsplash.com/photo-1498050108023-c5249f4df085",
     "https://images.unsplash.com/photo-1550751827-4bd374c3f58b",
+  ],
+  games: [
+    "https://images.unsplash.com/photo-1542751371-adc38448a05e",
+    "https://images.unsplash.com/photo-1550745165-9bc0b252726f",
+    "https://images.unsplash.com/photo-1493711662062-fa541adb3fc8",
   ],
   film: [
     "https://images.unsplash.com/photo-1485846234645-a62644f84728",

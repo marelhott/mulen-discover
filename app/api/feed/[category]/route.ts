@@ -38,6 +38,19 @@ const TECH_SOURCES: FeedSource[] = [
   { name: "IEEE Spectrum",    url: "https://spectrum.ieee.org/rss/fulltext",                                     siteUrl: "https://spectrum.ieee.org/",                       weight: 1.05 },
 ];
 
+const GAME_SOURCES: FeedSource[] = [
+  { name: "IGN",               url: "https://feeds.ign.com/ign/all",                                            siteUrl: "https://www.ign.com/",                            weight: 1.25 },
+  { name: "Kotaku",            url: "https://kotaku.com/rss",                                                   siteUrl: "https://kotaku.com/",                             weight: 1.15 },
+  { name: "PC Gamer",          url: "https://www.pcgamer.com/rss/",                                             siteUrl: "https://www.pcgamer.com/",                        weight: 1.18 },
+  { name: "Polygon",           url: "https://www.polygon.com/rss/index.xml",                                   siteUrl: "https://www.polygon.com/",                        weight: 1.12 },
+  { name: "Eurogamer",         url: "https://www.eurogamer.net/feed",                                           siteUrl: "https://www.eurogamer.net/",                      weight: 1.12 },
+  { name: "Rock Paper Shotgun",url: "https://www.rockpapershotgun.com/feed",                                   siteUrl: "https://www.rockpapershotgun.com/",               weight: 1.08 },
+  { name: "Game Rant",         url: "https://gamerant.com/feed/",                                               siteUrl: "https://gamerant.com/",                           weight: 1.0 },
+  { name: "Nintendo Life",     url: "https://www.nintendolife.com/feeds/latest",                               siteUrl: "https://www.nintendolife.com/",                   weight: 1.05 },
+  { name: "Destructoid",       url: "https://www.destructoid.com/feed/",                                       siteUrl: "https://www.destructoid.com/",                    weight: 1.05 },
+  { name: "GamesIndustry.biz", url: "https://www.gamesindustry.biz/feed",                                      siteUrl: "https://www.gamesindustry.biz/",                  weight: 1.12 },
+];
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type FeedArticle = {
@@ -174,14 +187,14 @@ const getCachedOgImage = unstable_cache(
   { revalidate: 86400 }
 );
 
-async function enrichImages(category: "ai" | "tech", articles: FeedArticle[]): Promise<FeedArticle[]> {
+async function enrichImages(category: "ai" | "tech" | "games", articles: FeedArticle[]): Promise<FeedArticle[]> {
   // RSS thumbnails are often tiny. Prefer publisher OG artwork for every card;
   // missing publisher art gets a full-resolution editorial image, never a logo.
   const results = await Promise.all(
     articles.map(a => getCachedOgImage(a.url).then(image => ({ url: a.url, image })))
   );
   const map = new Map(results.map(r => [r.url, r.image]));
-  const topic = category === "ai" ? "ai" : "technology";
+  const topic = category === "ai" ? "ai" : category === "games" ? "games" : "technology";
   return articles.map(a => ({
     ...a,
     image: map.get(a.url) ?? (isUsableArticleImage(a.image) ? a.image : null) ?? editorialFallbackImage(topic, a.id),
@@ -290,11 +303,11 @@ async function translateBatch(articles: FeedArticle[]): Promise<FeedArticle[]> {
 
 // ── Build feed pipeline ───────────────────────────────────────────────────────
 
-async function buildFeed(category: "ai" | "tech", fresh = false): Promise<FeedArticle[]> {
-  const sources = category === "ai" ? AI_SOURCES : TECH_SOURCES;
+async function buildFeed(category: "ai" | "tech" | "games", fresh = false): Promise<FeedArticle[]> {
+  const sources = category === "ai" ? AI_SOURCES : category === "tech" ? TECH_SOURCES : GAME_SOURCES;
 
   // 1. Fetch all RSS sources in parallel
-  const rawBatches = await Promise.all(sources.map(s => fetchRss(s, 7, fresh)));
+  const rawBatches = await Promise.all(sources.map(s => fetchRss(s, category === "games" ? 12 : 7, fresh)));
   const allRaw = rawBatches.flat();
 
   // 2. Two-level dedup + clustering + ranking
@@ -320,24 +333,26 @@ async function buildFeed(category: "ai" | "tech", fresh = false): Promise<FeedAr
 
 type FeedSnapshotData = { articles: FeedArticle[] };
 
-async function refreshFeedSnapshot(category: "ai" | "tech") {
+async function refreshFeedSnapshot(category: "ai" | "tech" | "games") {
   const articles = await buildFeed(category, true);
   return writeSnapshot(category, { articles } satisfies FeedSnapshotData, articles.length);
 }
 
-async function getFeedSnapshot(category: "ai" | "tech") {
+async function getFeedSnapshot(category: "ai" | "tech" | "games") {
   return readSnapshot<FeedSnapshotData>(category);
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export async function warmFeedCaches() {
-  const [ai, tech] = await Promise.allSettled([
+  const [ai, tech, games] = await Promise.allSettled([
     refreshFeedSnapshot("ai"), refreshFeedSnapshot("tech"),
+    refreshFeedSnapshot("games"),
   ]);
   return {
     ai: ai.status === "fulfilled" ? ai.value?.itemCount ?? 0 : 0,
     tech: tech.status === "fulfilled" ? tech.value?.itemCount ?? 0 : 0,
+    games: games.status === "fulfilled" ? games.value?.itemCount ?? 0 : 0,
   };
 }
 
@@ -346,7 +361,7 @@ export async function GET(
   { params }: { params: Promise<{ category: string }> }
 ) {
   const { category } = await params;
-  if (category !== "ai" && category !== "tech") {
+  if (category !== "ai" && category !== "tech" && category !== "games") {
     return NextResponse.json({ error: "Unknown category" }, { status: 400 });
   }
   const forceRefresh = new URL(request.url).searchParams.has("refresh");

@@ -3,7 +3,7 @@ import { unstable_cache } from "next/cache";
 import { hasGoogleTranslateKey, translateTexts } from "@/lib/googleTranslate";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const ALLOWED_ARTICLE_DOMAINS = [
   "openai.com", "deepmind.google", "huggingface.co", "theverge.com", "technologyreview.com",
@@ -12,6 +12,8 @@ const ALLOWED_ARTICLE_DOMAINS = [
   "macrumors.com", "bleepingcomputer.com", "tomshardware.com", "spectrum.ieee.org",
   "deadline.com", "variety.com", "hollywoodreporter.com", "indiewire.com", "screendaily.com",
   "filmneweurope.com", "moviezone.cz",
+  "ign.com", "kotaku.com", "pcgamer.com", "polygon.com", "eurogamer.net", "rockpapershotgun.com",
+  "gamerant.com", "nintendolife.com", "destructoid.com", "gamesindustry.biz",
 ];
 
 function isAllowedArticleUrl(value: string) {
@@ -67,32 +69,34 @@ function extractReadableContent(html: string): { content: string; image: string 
                    ?? html.match(/class=["'][^"']*author[^"']*["'][^>]*>([^<]{2,60})</i);
   const author = authorMatch?.[1]?.trim().replace(/<[^>]+>/g, "") ?? null;
 
-  // Try to find main article content in order of preference
+  // Candidate regions can be incomplete on publisher sites. We score the
+  // semantic region and the cleaned page by real paragraph content instead of
+  // accepting the first HTML match, which often was just a short excerpt.
   const articlePatterns = [
     /<article[^>]*>([\s\S]*?)<\/article>/i,
     /<div[^>]+(?:class|id)=["'][^"']*(?:article-body|entry-content|post-content|article-content|story-body|main-content|content-body)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
     /<main[^>]*>([\s\S]*?)<\/main>/i,
   ];
 
-  let bodyHtml = "";
+  const candidates: string[] = [clean];
   for (const pattern of articlePatterns) {
     const m = clean.match(pattern);
     if (m?.[1] && m[1].length > 200) {
-      bodyHtml = m[1];
-      break;
+      candidates.push(m[1]);
     }
   }
 
-  if (!bodyHtml) {
-    // Fallback: extract all <p> tags
-    const paragraphs = [...clean.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)];
-    bodyHtml = paragraphs.map(m => m[1]).join("\n");
-  }
+  const rankedCandidates = candidates.map((candidate) => {
+    const paragraphs = extractParagraphs(candidate);
+    return {
+      candidate,
+      paragraphs,
+      score: paragraphs.reduce((total, paragraph) => total + paragraph.length, 0),
+    };
+  }).sort((left, right) => right.score - left.score);
 
-  // Keep native paragraph boundaries; removing all tags first previously merged a
-  // full story into a tiny, unreadable excerpt in the modal.
-  let paras = extractParagraphs(bodyHtml);
-  if (paras.length === 0) paras = extractParagraphs(clean);
+  const bodyHtml = rankedCandidates[0]?.candidate ?? clean;
+  let paras = rankedCandidates[0]?.paragraphs ?? [];
   if (paras.length === 0) {
     const text = decodeHtml(bodyHtml.replace(/<\/(?:p|div|section|h[1-6])>/gi, "\n\n"));
     paras = text.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter((paragraph) => paragraph.length >= 55);
@@ -134,7 +138,7 @@ async function fetchArticle(url: string) {
 
 const getCachedArticle = unstable_cache(
   async (url: string) => fetchArticle(url),
-  ["article-content-v3"],
+  ["article-content-v4"],
   { revalidate: 3600 }
 );
 

@@ -1,6 +1,6 @@
 import { get, put } from "@vercel/blob";
 
-export type SnapshotSection = "ai" | "tech" | "news" | "movies";
+export type SnapshotSection = "ai" | "tech" | "games" | "news" | "movies";
 
 export type SectionSnapshot<T> = {
   schemaVersion: 1;

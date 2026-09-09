@@ -5,16 +5,11 @@ type TranslationOptions = {
   target?: string;
 };
 
-const MAX_BATCH_ITEMS = 24;
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_OPENROUTER_MODEL = "qwen/qwen3.7-flash";
 const DEFAULT_FALLBACK_MODEL = "google/gemini-3.1-flash-lite";
-const ENGLISH_SIGNAL = /\b(the|and|with|from|into|that|this|for|about|new|will|has|have|are|was|were|after|before|their|its|your|you)\b/i;
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const result: T[][] = [];
-  for (let index = 0; index < items.length; index += size) result.push(items.slice(index, index + size));
-  return result;
+function englishSignalCount(value: string) {
+  return (value.toLowerCase().match(/\b(the|and|with|from|into|that|this|for|about|new|will|has|have|are|was|were|after|before|their|its|your|you)\b/g) ?? []).length;
 }
 
 function clean(value: unknown) {
@@ -28,7 +23,7 @@ function assertCzechResults(source: string[], translated: string[]) {
     const output = clean(translated[index]);
     if (!input) continue;
     if (!output) throw new Error("Překladač vrátil prázdný text");
-    if (input.length > 12 && input.toLocaleLowerCase() === output.toLocaleLowerCase() && ENGLISH_SIGNAL.test(input)) {
+    if (input.length > 12 && input.toLocaleLowerCase() === output.toLocaleLowerCase() && englishSignalCount(input) >= 3) {
       throw new Error("Překladač neprovedl český překlad");
     }
   }

@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react";
 import TabNav, { Tab } from "./TabNav";
-import MovieGrid from "./MovieGrid";
 import NewsTab from "./NewsTab";
 import FeedTab from "./FeedTab";
 
 export default function AppShell() {
   const [tab, setTab] = useState<Tab>("ai");
   const [visited, setVisited] = useState<Record<Tab, boolean>>({
-    ai: true, tech: false, news: false, releases: false,
+    ai: true, tech: false, news: false, games: false,
   });
 
   const selectTab = (nextTab: Tab) => {
@@ -19,14 +18,14 @@ export default function AppShell() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setVisited((current) => (current.releases ? current : { ...current, releases: true }));
+      setVisited((current) => (current.games ? current : { ...current, games: true }));
     }, 1200);
     return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     const id = window.requestIdleCallback(() => {
-      setVisited(() => ({ ai: true, tech: true, news: true, releases: true }));
+      setVisited(() => ({ ai: true, tech: true, news: true, games: true }));
     }, { timeout: 4000 });
     return () => window.cancelIdleCallback(id);
   }, []);
@@ -50,9 +49,9 @@ export default function AppShell() {
         <section className={tab === "news" ? "block" : "hidden"}>
           <NewsTab />
         </section>
-        {visited.releases && (
-          <section className={tab === "releases" ? "block" : "hidden"}>
-            <MovieGrid />
+        {visited.games && (
+          <section className={tab === "games" ? "block" : "hidden"}>
+            <FeedTab category="games" />
           </section>
         )}
         {visited.ai && (

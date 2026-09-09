@@ -8,7 +8,7 @@ import { formatDistanceToNow } from "date-fns";
 import { cs } from "date-fns/locale";
 import { editorialFallbackImage } from "@/lib/editorialImages";
 
-export type FeedCategory = "ai" | "tech";
+export type FeedCategory = "ai" | "tech" | "games";
 
 type FeedArticle = {
   id: string;
@@ -27,9 +27,13 @@ type FeedArticle = {
 
 type FeedCache = { articles: FeedArticle[]; hydrated: boolean; fetchedAt: number };
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const GAME_SOURCES = new Set([
+  "IGN", "Kotaku", "PC Gamer", "Polygon", "Eurogamer", "Rock Paper Shotgun",
+  "Game Rant", "Nintendo Life", "Destructoid", "GamesIndustry.biz",
+]);
 
 function makeCache(): FeedCache { return { articles: [], hydrated: false, fetchedAt: 0 }; }
-const caches: Record<FeedCategory, FeedCache> = { ai: makeCache(), tech: makeCache() };
+const caches: Record<FeedCategory, FeedCache> = { ai: makeCache(), tech: makeCache(), games: makeCache() };
 function storageKey(c: FeedCategory) { return `movie-releases:feed-${c}:v2`; }
 
 function timeAgo(value: string) {
@@ -175,7 +179,9 @@ function FeedCard({ article, onClick }: { article: FeedArticle; onClick: () => v
   const body = article.summary_cs ?? article.summary;
   const topic = article.source.includes("AI") || article.source === "OpenAI Blog" || article.source === "Google DeepMind"
     ? "ai"
-    : "technology";
+    : GAME_SOURCES.has(article.source)
+      ? "games"
+      : "technology";
   const fallbackImage = editorialFallbackImage(topic, article.id);
   const imgSrc = !imgError && article.image ? article.image : fallbackImage;
 
@@ -294,7 +300,7 @@ export default function FeedTab({ category }: { category: FeedCategory }) {
     void load(true);
   }, [load, category, cache]);
 
-  const heading = category === "ai" ? "Umělá inteligence" : "Technologie";
+  const heading = category === "ai" ? "Umělá inteligence" : category === "tech" ? "Technologie" : "Herní novinky";
 
   return (
     <>

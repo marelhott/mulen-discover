@@ -1,12 +1,12 @@
 "use client";
 
-export type Tab = "ai" | "tech" | "news" | "releases";
+export type Tab = "ai" | "tech" | "news" | "games";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "ai", label: "AI" },
   { id: "tech", label: "Technologie" },
   { id: "news", label: "Film" },
-  { id: "releases", label: "Nové filmy" },
+  { id: "games", label: "Hry" },
 ];
 
 export default function TabNav({

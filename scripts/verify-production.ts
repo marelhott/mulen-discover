@@ -17,7 +17,7 @@ function assertFresh(label: string, freshness: Freshness | undefined) {
   if (!timestamp || Date.now() - timestamp > 10 * 60_000) throw new Error(`${label}: snapshot je starší než 10 minut`);
 }
 
-async function verifyFeed(path: "/api/feed/ai" | "/api/feed/tech") {
+async function verifyFeed(path: "/api/feed/ai" | "/api/feed/tech" | "/api/feed/games") {
   const payload = await getJson<{ articles: FeedArticle[]; freshness?: Freshness }>(path);
   if (payload.articles.length === 0) throw new Error(`${path}: prázdný feed`);
   const untranslated = payload.articles.filter((article) =>
@@ -30,22 +30,19 @@ async function verifyFeed(path: "/api/feed/ai" | "/api/feed/tech") {
 }
 
 async function main() {
-  const [ai, tech, news, movies] = await Promise.all([
+  const [ai, tech, games, news] = await Promise.all([
     verifyFeed("/api/feed/ai"),
     verifyFeed("/api/feed/tech"),
+    verifyFeed("/api/feed/games"),
     getJson<{ articles: NewsArticle[]; freshness?: Freshness }>("/api/news?page=1&pageSize=30"),
-    getJson<{ vod: Array<{ releases?: unknown[]; torrents?: unknown[] }>; recent: unknown[]; freshness?: Freshness }>("/api/movies?page=1"),
   ]);
   if (news.articles.length === 0) throw new Error("/api/news: prázdný feed");
   if (news.articles.some((article) => (article.title_cs === article.title_en && englishSignal.test(article.title_en)) || !article.body_cs || englishLabels.has(article.category_label))) {
     throw new Error("/api/news: česká data nejsou kompletní");
   }
-  if (movies.vod.some((movie) => (movie.releases?.length ?? 0) === 0 && (movie.torrents?.length ?? 0) === 0)) {
-    throw new Error("/api/movies: nepotvrzený film je označený jako dostupný");
-  }
   assertFresh("/api/news", news.freshness);
-  assertFresh("/api/movies", movies.freshness);
-  console.log(`OK — AI ${ai}, Technologie ${tech}, Film ${news.articles.length}, potvrzené releasy ${movies.vod.length}, nedávné tituly ${movies.recent.length}`);
+  if (games < 30) throw new Error(`/api/feed/games: očekáváno alespoň 30 čerstvých zpráv, aktuálně ${games}`);
+  console.log(`OK — AI ${ai}, Technologie ${tech}, Hry ${games}, Film ${news.articles.length}`);
 }
 
 main().catch((error) => {

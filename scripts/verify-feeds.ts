@@ -13,6 +13,7 @@
  *   npx tsx scripts/verify-feeds.ts              # all sources
  *   npx tsx scripts/verify-feeds.ts --category ai
  *   npx tsx scripts/verify-feeds.ts --category tech
+ *   npx tsx scripts/verify-feeds.ts --category games
  *   npx tsx scripts/verify-feeds.ts --claude      # + AI relevance check
  *   npx tsx scripts/verify-feeds.ts --url https://example.com/feed.xml --topic "artificial intelligence"
  */
@@ -44,6 +45,19 @@ const TECH_SOURCES = [
   { name: "BleepingComputer", url: "https://www.bleepingcomputer.com/feed/",                                    topic: "cybersecurity news" },
   { name: "Tom's Hardware",   url: "https://www.tomshardware.com/feeds/all",                                    topic: "hardware, CPUs, GPUs" },
   { name: "IEEE Spectrum",    url: "https://spectrum.ieee.org/rss/fulltext",                                    topic: "engineering, electronics" },
+];
+
+const GAME_SOURCES = [
+  { name: "IGN",               url: "https://feeds.ign.com/ign/all",                                            topic: "video game news, reviews and releases" },
+  { name: "Kotaku",            url: "https://kotaku.com/rss",                                                   topic: "video game news and culture" },
+  { name: "PC Gamer",          url: "https://www.pcgamer.com/rss/",                                             topic: "PC games, hardware and game industry" },
+  { name: "Polygon",           url: "https://www.polygon.com/rss/index.xml",                                   topic: "video game news and culture" },
+  { name: "Eurogamer",         url: "https://www.eurogamer.net/feed",                                           topic: "video game news and reviews" },
+  { name: "Rock Paper Shotgun",url: "https://www.rockpapershotgun.com/feed",                                   topic: "PC game news and reviews" },
+  { name: "Game Rant",         url: "https://gamerant.com/feed/",                                               topic: "video game news" },
+  { name: "Nintendo Life",     url: "https://www.nintendolife.com/feeds/latest",                               topic: "Nintendo game news" },
+  { name: "Destructoid",       url: "https://www.destructoid.com/feed/",                                       topic: "video game news and culture" },
+  { name: "GamesIndustry.biz", url: "https://www.gamesindustry.biz/feed",                                      topic: "game business and industry news" },
 ];
 
 // ── XML parser ────────────────────────────────────────────────────────────────
@@ -241,8 +255,10 @@ async function main() {
     sources = AI_SOURCES;
   } else if (categoryArg === "tech") {
     sources = TECH_SOURCES;
+  } else if (categoryArg === "games") {
+    sources = GAME_SOURCES;
   } else {
-    sources = [...AI_SOURCES, ...TECH_SOURCES];
+    sources = [...AI_SOURCES, ...TECH_SOURCES, ...GAME_SOURCES];
   }
 
   console.log(bold(`\n🔍 Verifying ${sources.length} RSS sources…`) + (checkClaude ? " (+ Claude relevance)" : ""));

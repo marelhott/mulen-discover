@@ -23,17 +23,17 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: "Mulen Discover",
-  description: "Český přehled AI, technologií, filmových novinek a nových titulů.",
+  description: "Český přehled AI, technologií, filmových a herních novinek.",
   openGraph: {
     title: "Mulen Discover",
-    description: "Český přehled AI, technologií, filmových novinek a nových titulů.",
+    description: "Český přehled AI, technologií, filmových a herních novinek.",
     type: "website",
     url: siteUrl,
   },
   twitter: {
     card: "summary_large_image",
     title: "Mulen Discover",
-    description: "Český přehled AI, technologií, filmových novinek a nových titulů.",
+    description: "Český přehled AI, technologií, filmových a herních novinek.",
   },
 };
 
