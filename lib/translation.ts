@@ -6,7 +6,7 @@ type TranslationOptions = {
 };
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_OPENROUTER_MODEL = "qwen/qwen3.7-flash";
+const DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v4.1-flash-1017";
 const DEFAULT_FALLBACK_MODEL = "google/gemini-3.1-flash-lite";
 function englishSignalCount(value: string) {
   return (value.toLowerCase().match(/\b(the|and|with|from|into|that|this|for|about|new|will|has|have|are|was|were|after|before|their|its|your|you)\b/g) ?? []).length;
@@ -51,6 +51,8 @@ async function translateWithOpenRouter(texts: string[], options: TranslationOpti
         },
         body: JSON.stringify({
           model,
+          // DeepSeek V4 thinks first by default; for plain translation that only slows the answer.
+          ...(model.startsWith("deepseek/") ? { reasoning: { enabled: false } } : {}),
           temperature: 0,
           max_tokens: Math.max(256, texts.reduce((total, text) => total + Math.ceil(text.length / 2), 0)),
           provider: { sort: "throughput" },

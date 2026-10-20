@@ -5,7 +5,7 @@
 ## Produkční proměnné
 
 - `BLOB_READ_WRITE_TOKEN` — připojené privátní Vercel Blob úložiště.
-- `OPENROUTER_API_KEY` — primární překladač; výchozí model je `qwen/qwen3.7-flash`, fallback `google/gemini-3.1-flash-lite`.
+- `OPENROUTER_API_KEY` — primární překladač; výchozí model je `deepseek/deepseek-v4.1-flash-1017`, fallback `google/gemini-3.1-flash-lite`.
 - `CRON_SECRET` — chrání interní aktualizační endpointy.
 - `TMDB_API_KEY` — filmová metadata.
 
